@@ -15,6 +15,7 @@
         .hidden { display: none; }
     </style>
     <script src="src/js/auth.js"></script>
+    <script src="src/js/responsive-table.js"></script>
 </head>
 <body class="bg-gray-50">
     <!-- Analytics Header -->
@@ -192,67 +193,111 @@
                     <h3 class="text-lg font-semibold text-gray-900">Performance by CRM</h3>
                     <p class="text-sm text-gray-600">Sync success rates by integration</p>
                 </div>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center">
-                            <div class="w-8 h-8 bg-orange-100 rounded-md flex items-center justify-center mr-3">
-                                <span class="text-xs font-bold text-orange-600">SF</span>
-                            </div>
-                            <span class="text-sm font-medium">Salesforce</span>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="text-sm text-gray-500 mr-2">99.2%</span>
-                            <div class="w-20 bg-gray-200 rounded-full h-2">
-                                <div class="bg-green-500 h-2 rounded-full" style="width: 99.2%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center">
-                            <div class="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center mr-3">
-                                <span class="text-xs font-bold text-blue-600">HS</span>
-                            </div>
-                            <span class="text-sm font-medium">HubSpot</span>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="text-sm text-gray-500 mr-2">98.7%</span>
-                            <div class="w-20 bg-gray-200 rounded-full h-2">
-                                <div class="bg-green-500 h-2 rounded-full" style="width: 98.7%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center">
-                            <div class="w-8 h-8 bg-red-100 rounded-md flex items-center justify-center mr-3">
-                                <span class="text-xs font-bold text-red-600">ZH</span>
-                            </div>
-                            <span class="text-sm font-medium">Zoho CRM</span>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="text-sm text-gray-500 mr-2">97.1%</span>
-                            <div class="w-20 bg-gray-200 rounded-full h-2">
-                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 97.1%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center">
-                            <div class="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center mr-3">
-                                <span class="text-xs font-bold text-purple-600">PP</span>
-                            </div>
-                            <span class="text-sm font-medium">Pipedrive</span>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="text-sm text-gray-500 mr-2">96.4%</span>
-                            <div class="w-20 bg-gray-200 rounded-full h-2">
-                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 96.4%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <table class="w-full" data-responsive="true">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="text-left py-3 px-4 font-medium text-gray-900" data-priority="high" data-sortable="true">CRM Platform</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-900" data-priority="high" data-sortable="true" data-type="number">Success Rate</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-900" data-priority="normal" data-sortable="true" data-type="number">Syncs Today</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-900" data-priority="normal" data-sortable="true">Status</th>
+                            <th class="text-left py-3 px-4 font-medium text-gray-900" data-priority="low" data-sortable="true">Last Sync</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-orange-100 rounded-md flex items-center justify-center mr-3">
+                                        <span class="text-xs font-bold text-orange-600">SF</span>
+                                    </div>
+                                    <span class="font-medium">Salesforce</span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-green-600">99.2%</span>
+                                    <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-green-500 h-2 rounded-full" style="width: 99.2%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 text-gray-700">1,247</td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Healthy</span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-500">2 min ago</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center mr-3">
+                                        <span class="text-xs font-bold text-blue-600">HS</span>
+                                    </div>
+                                    <span class="font-medium">HubSpot</span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-green-600">98.7%</span>
+                                    <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-green-500 h-2 rounded-full" style="width: 98.7%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 text-gray-700">892</td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Healthy</span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-500">5 min ago</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-red-100 rounded-md flex items-center justify-center mr-3">
+                                        <span class="text-xs font-bold text-red-600">ZH</span>
+                                    </div>
+                                    <span class="font-medium">Zoho CRM</span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-yellow-600">97.1%</span>
+                                    <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-yellow-500 h-2 rounded-full" style="width: 97.1%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 text-gray-700">634</td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Warning</span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-500">8 min ago</td>
+                        </tr>
+                        <tr class="border-b border-gray-100 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center mr-3">
+                                        <span class="text-xs font-bold text-purple-600">PP</span>
+                                    </div>
+                                    <span class="font-medium">Pipedrive</span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-yellow-600">96.4%</span>
+                                    <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                                        <div class="bg-yellow-500 h-2 rounded-full" style="width: 96.4%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 text-gray-700">423</td>
+                            <td class="py-3 px-4">
+                                <span class="inline-flex px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Warning</span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-500">12 min ago</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
             <!-- Peak Usage Times -->
