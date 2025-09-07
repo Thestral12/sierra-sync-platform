@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Role Access - Sierra Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="src/js/auth.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">Role-Based Access Control Test</h1>
+        
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Current Session</h2>
+            <div id="sessionInfo" class="space-y-2">
+                <p>Loading...</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Different Roles</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <button onclick="testLogin('operations')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Test Operations Role
+                </button>
+                <button onclick="testLogin('admin')" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                    Test Admin Role
+                </button>
+                <button onclick="testLogin('analytics')" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    Test Analytics Role
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Navigate to Dashboards</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <a href="main-dashboard.html" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-center">
+                    Operations Dashboard
+                </a>
+                <a href="dashboard.html" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-center">
+                    Admin Dashboard
+                </a>
+                <a href="analytics-dashboard.html" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-center">
+                    Analytics Dashboard
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4">Access Control Matrix</h2>
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border p-2 text-left">Role</th>
+                        <th class="border p-2 text-center">Operations Dashboard</th>
+                        <th class="border p-2 text-center">Admin Dashboard</th>
+                        <th class="border p-2 text-center">Analytics Dashboard</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="border p-2 font-semibold">Operations</td>
+                        <td class="border p-2 text-center">✅ Full Access</td>
+                        <td class="border p-2 text-center">❌ No Access</td>
+                        <td class="border p-2 text-center">❌ No Access</td>
+                    </tr>
+                    <tr class="bg-gray-50">
+                        <td class="border p-2 font-semibold">Admin</td>
+                        <td class="border p-2 text-center">✅ Full Access</td>
+                        <td class="border p-2 text-center">✅ Full Access</td>
+                        <td class="border p-2 text-center">✅ Full Access</td>
+                    </tr>
+                    <tr>
+                        <td class="border p-2 font-semibold">Analytics</td>
+                        <td class="border p-2 text-center">✅ Full Access</td>
+                        <td class="border p-2 text-center">❌ No Access</td>
+                        <td class="border p-2 text-center">✅ Full Access</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-6 flex gap-4">
+            <button onclick="auth.logout()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                Logout
+            </button>
+            <a href="clear-session.html" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">
+                Clear All Sessions
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Display current session info
+        async function displaySessionInfo() {
+            const sessionDiv = document.getElementById('sessionInfo');
+            
+            if (!auth.isAuthenticated) {
+                sessionDiv.innerHTML = `
+                    <p class="text-red-600">Not authenticated</p>
+                    <a href="login.html" class="text-blue-600 underline">Go to Login</a>
+                `;
+                return;
+            }
+            
+            try {
+                const user = await auth.getCurrentUser();
+                sessionDiv.innerHTML = `
+                    <p><strong>Name:</strong> ${user.name}</p>
+                    <p><strong>Email:</strong> ${user.email}</p>
+                    <p><strong>Role:</strong> <span class="px-2 py-1 rounded text-sm font-semibold ${
+                        user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                        user.role === 'analytics' ? 'bg-green-100 text-green-800' :
+                        'bg-blue-100 text-blue-800'
+                    }">${user.role}</span></p>
+                    <p><strong>Dashboard:</strong> ${user.dashboard || 'main-dashboard.html'}</p>
+                `;
+            } catch (error) {
+                sessionDiv.innerHTML = `<p class="text-red-600">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Test login with different roles
+        async function testLogin(role) {
+            try {
+                // Clear existing session
+                auth.clearSession();
+                
+                // Create demo session
+                const users = {
+                    'operations': {
+                        email: 'demo@sierrasync.com',
+                        name: 'Demo User',
+                        dashboard: 'main-dashboard.html'
+                    },
+                    'admin': {
+                        email: 'admin@sierrasync.com',
+                        name: 'Admin User',
+                        dashboard: 'dashboard.html'
+                    },
+                    'analytics': {
+                        email: 'analytics@sierrasync.com',
+                        name: 'Analytics User',
+                        dashboard: 'analytics-dashboard.html'
+                    }
+                };
+                
+                const user = users[role];
+                const sessionData = {
+                    id: Math.floor(Math.random() * 10000),
+                    email: user.email,
+                    name: user.name,
+                    role: role,
+                    dashboard: user.dashboard,
+                    loginTime: new Date().toISOString()
+                };
+                
+                sessionStorage.setItem('sierraSync_session', JSON.stringify(sessionData));
+                sessionStorage.setItem('sierraSync_token', 'test_token_' + Date.now());
+                
+                // Reinitialize auth
+                window.auth = new SierraSyncAuth();
+                
+                // Refresh display
+                await displaySessionInfo();
+                
+                alert(`Logged in as ${role} role. You can now test navigation.`);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // Display session info on load
+        document.addEventListener('DOMContentLoaded', displaySessionInfo);
+    </script>
+</body>
+</html>

@@ -1,0 +1,432 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18.x'
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: sierra-sync-platform
+
+jobs:
+  # Code Quality Checks
+  lint-and-format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run ESLint
+      run: npm run lint
+    
+    - name: Run Prettier check
+      run: npm run format:check
+    
+    - name: Run TypeScript check
+      run: npm run typecheck
+
+  # Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run npm audit
+      run: npm audit --audit-level=moderate
+    
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/node@master
+      continue-on-error: true
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+    
+    - name: CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: typescript, javascript
+    
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v2
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+  # Unit Tests
+  unit-tests:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run unit tests
+      run: npm run test:unit
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET: test-jwt-secret
+        JWT_REFRESH_SECRET: test-refresh-secret
+        SUPABASE_URL: http://localhost:54321
+        SUPABASE_ANON_KEY: test-key
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unit-tests
+        name: codecov-umbrella
+
+  # Integration Tests
+  integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run database migrations
+      run: npm run db:migrate
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+    
+    - name: Start API server
+      run: npm run api:start:test &
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET: test-jwt-secret
+        PORT: 3001
+    
+    - name: Wait for API server
+      run: npx wait-on http://localhost:3001/health
+    
+    - name: Run integration tests
+      run: npm run test:integration
+      env:
+        API_BASE_URL: http://localhost:3001
+        NODE_ENV: test
+
+  # End-to-End Tests
+  e2e-tests:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+    
+    - name: Build application
+      run: npm run build
+      env:
+        NODE_ENV: production
+    
+    - name: Start application
+      run: |
+        npm run api:start:test &
+        npm run web:start:test &
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        REDIS_URL: redis://localhost:6379
+        API_PORT: 3001
+        WEB_PORT: 3000
+    
+    - name: Wait for application
+      run: |
+        npx wait-on http://localhost:3001/health
+        npx wait-on http://localhost:3000
+    
+    - name: Run Playwright tests
+      run: npx playwright test
+      env:
+        E2E_BASE_URL: http://localhost:3000
+    
+    - name: Upload Playwright Report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: playwright-report
+        path: test-results/playwright-report/
+        retention-days: 30
+
+  # Performance Tests
+  performance-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install K6
+      run: |
+        sudo gpg -k
+        sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+    
+    - name: Build and start application
+      run: |
+        npm run build
+        npm run start &
+      env:
+        NODE_ENV: production
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        REDIS_URL: ${{ secrets.REDIS_URL }}
+    
+    - name: Wait for application
+      run: npx wait-on http://localhost:3000
+    
+    - name: Run performance tests
+      run: k6 run tests/load/scenario.js
+      env:
+        BASE_URL: http://localhost:3000
+        API_KEY: ${{ secrets.TEST_API_KEY }}
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: performance-results/
+
+  # Build and Push Docker Images
+  build-and-push:
+    needs: [lint-and-format, security-scan, unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Deploy to Staging
+  deploy-staging:
+    needs: [build-and-push, e2e-tests]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment"
+        # Add deployment commands here
+        # For example, using kubectl, docker-compose, or cloud provider CLI
+      env:
+        STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        STAGING_REDIS_URL: ${{ secrets.STAGING_REDIS_URL }}
+    
+    - name: Run smoke tests against staging
+      run: |
+        npx playwright test --config=playwright.staging.config.ts
+      env:
+        E2E_BASE_URL: https://staging.sierrasync.com
+
+  # Deploy to Production
+  deploy-production:
+    needs: [build-and-push, e2e-tests, performance-tests]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment"
+        # Add production deployment commands here
+      env:
+        PRODUCTION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        PRODUCTION_REDIS_URL: ${{ secrets.PRODUCTION_REDIS_URL }}
+    
+    - name: Run health checks
+      run: |
+        curl -f https://api.sierrasync.com/health || exit 1
+        curl -f https://sierrasync.com || exit 1
+    
+    - name: Notify deployment success
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: "✅ Production deployment successful!"
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Cleanup
+  cleanup:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [unit-tests, integration-tests, e2e-tests, performance-tests]
+    
+    steps:
+    - name: Clean up test artifacts
+      run: |
+        echo "Cleaning up test artifacts and temporary resources"
+        # Add cleanup commands here
+    
+    - name: Generate test report
+      run: |
+        echo "Generating comprehensive test report"
+        # Combine all test results into a single report

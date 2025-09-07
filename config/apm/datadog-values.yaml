@@ -1,0 +1,337 @@
+# DataDog Helm Chart Values for Sierra Sync
+# Comprehensive APM, logging, and monitoring configuration
+
+targetSystem: "linux"
+datadog:
+  # DataDog API and APP keys
+  apiKey: ${DD_API_KEY}
+  appKey: ${DD_APP_KEY}
+  
+  # Site configuration (use datadoghq.com for US1)
+  site: datadoghq.com
+  
+  # Cluster name
+  clusterName: sierra-sync-production
+  
+  # Tags
+  tags:
+    - "env:production"
+    - "service:sierra-sync"
+    - "team:platform"
+    - "version:${VERSION}"
+  
+  # Logs
+  logs:
+    enabled: true
+    containerCollectAll: true
+    containerCollectUsingFiles: true
+    
+  # APM
+  apm:
+    enabled: true
+    portEnabled: true
+    port: 8126
+    useSocketVolume: true
+    socketPath: /var/run/datadog/apm.socket
+    hostSocketPath: /var/run/datadog/
+    
+  # Process monitoring
+  processAgent:
+    enabled: true
+    processCollection: true
+    
+  # System probe (for network monitoring)
+  systemProbe:
+    enabled: true
+    enableTCPQueueLength: true
+    enableOOMKill: true
+    collectDNSStats: true
+    enableConntrack: true
+    
+  # Network monitoring
+  networkMonitoring:
+    enabled: true
+    
+  # Security monitoring
+  securityAgent:
+    enabled: true
+    compliance:
+      enabled: true
+      checkInterval: 20m
+    runtime:
+      enabled: true
+      
+  # Orchestrator Explorer
+  orchestratorExplorer:
+    enabled: true
+    
+  # Cluster checks
+  clusterChecks:
+    enabled: true
+    
+  # Kubelet configuration
+  kubelet:
+    tlsVerify: false
+    
+  # Custom checks
+  checksCardinality: high
+  
+  # Prometheus scraping
+  prometheusScrape:
+    enabled: true
+    serviceEndpoints: true
+    additionalConfigs:
+      - configurations:
+        - prometheus_url: http://prometheus:9090/metrics
+          namespace: sierra-sync
+          metrics:
+            - "*"
+            
+  # Environment variables
+  env:
+    - name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
+      value: "true"
+    - name: DD_CONTAINER_EXCLUDE
+      value: "name:datadog-agent"
+    - name: DD_KUBERNETES_POD_LABELS_AS_TAGS
+      value: '{"app":"app","version":"version"}'
+    - name: DD_KUBERNETES_POD_ANNOTATIONS_AS_TAGS
+      value: '{"prometheus.io/scrape":"prometheus"}'
+      
+# Cluster Agent
+clusterAgent:
+  enabled: true
+  replicas: 2
+  
+  # RBAC
+  rbac:
+    create: true
+    
+  # Metrics Provider for HPA
+  metricsProvider:
+    enabled: true
+    wpaController: true
+    useDatadogMetrics: true
+    createReaderRbac: true
+    
+  # Admission Controller
+  admissionController:
+    enabled: true
+    mutateUnlabelled: true
+    
+  # Resources
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      
+  # Tolerations for control plane
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+      
+# Node Agent (DaemonSet)
+agents:
+  enabled: true
+  
+  # Image
+  image:
+    repository: gcr.io/datadoghq/agent
+    tag: "7"
+    pullPolicy: IfNotPresent
+    
+  # RBAC
+  rbac:
+    create: true
+    
+  # Resources
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+      
+  # Volume mounts
+  volumeMounts:
+    - name: docker-socket
+      mountPath: /var/run/docker.sock
+      readOnly: true
+    - name: proc
+      mountPath: /host/proc
+      readOnly: true
+    - name: cgroup
+      mountPath: /host/sys/fs/cgroup
+      readOnly: true
+      
+  # Volumes
+  volumes:
+    - name: docker-socket
+      hostPath:
+        path: /var/run/docker.sock
+    - name: proc
+      hostPath:
+        path: /proc
+    - name: cgroup
+      hostPath:
+        path: /sys/fs/cgroup
+        
+  # Use host network for system probe
+  useHostNetwork: true
+  
+  # Tolerations for all nodes
+  tolerations:
+    - operator: Exists
+      
+# Cluster Checks Runner
+clusterChecksRunner:
+  enabled: true
+  replicas: 2
+  
+  # RBAC
+  rbac:
+    create: true
+    
+  # Resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+      
+# Kube State Metrics
+kubeStateMetricsCore:
+  enabled: true
+  
+  # RBAC
+  rbac:
+    create: true
+    
+# Custom integrations
+datadog-monitors:
+  # API monitoring
+  - name: "Sierra Sync API Response Time"
+    type: "metric alert"
+    query: "avg(last_5m):avg:trace.express.request.duration{env:production,service:sierra-sync-api} > 1000"
+    message: "Sierra Sync API response time is above 1s @slack-platform-alerts"
+    tags:
+      - "service:api"
+      - "team:platform"
+    options:
+      thresholds:
+        critical: 1000
+        warning: 500
+      notify_no_data: true
+      no_data_timeframe: 10
+      
+  - name: "Sierra Sync API Error Rate"
+    type: "metric alert"
+    query: "sum(last_5m):sum:trace.express.request.errors{env:production,service:sierra-sync-api}.as_rate() > 0.05"
+    message: "Sierra Sync API error rate is above 5% @slack-platform-alerts"
+    tags:
+      - "service:api"
+      - "team:platform"
+    options:
+      thresholds:
+        critical: 0.05
+        warning: 0.02
+        
+  - name: "Database Connection Pool"
+    type: "metric alert"
+    query: "avg(last_5m):avg:postgresql.connections.active{env:production} / avg:postgresql.connections.max{env:production} > 0.8"
+    message: "Database connection pool usage is above 80% @slack-platform-alerts"
+    tags:
+      - "service:database"
+      - "team:platform"
+    options:
+      thresholds:
+        critical: 0.8
+        warning: 0.6
+        
+  - name: "Redis Memory Usage"
+    type: "metric alert"
+    query: "avg(last_5m):avg:redis.mem.used{env:production} / avg:redis.mem.maxmemory{env:production} > 0.9"
+    message: "Redis memory usage is above 90% @slack-platform-alerts"
+    tags:
+      - "service:cache"
+      - "team:platform"
+    options:
+      thresholds:
+        critical: 0.9
+        warning: 0.75
+        
+  - name: "Kubernetes Pod Crashes"
+    type: "metric alert"
+    query: "sum(last_5m):sum:kubernetes.containers.restarts{namespace:sierra-sync} > 5"
+    message: "More than 5 pod restarts in Sierra Sync namespace @slack-platform-alerts"
+    tags:
+      - "service:kubernetes"
+      - "team:platform"
+    options:
+      thresholds:
+        critical: 5
+        warning: 2
+        
+  - name: "SSL Certificate Expiry"
+    type: "metric alert"
+    query: "min(last_5m):min:tls.cert.expiration{env:production} - time() < 604800"
+    message: "SSL certificate expiring in less than 7 days @slack-platform-alerts"
+    tags:
+      - "service:security"
+      - "team:platform"
+    options:
+      thresholds:
+        critical: 604800  # 7 days
+        warning: 2592000  # 30 days
+        
+# Dashboard configuration
+dashboards:
+  - title: "Sierra Sync Production Overview"
+    description: "Main production dashboard for Sierra Sync platform"
+    widgets:
+      - type: "timeseries"
+        title: "API Request Rate"
+        query: "sum:trace.express.request.hits{env:production,service:sierra-sync-api}.as_rate()"
+        
+      - type: "timeseries"
+        title: "API Response Time (p95)"
+        query: "p95:trace.express.request.duration{env:production,service:sierra-sync-api}"
+        
+      - type: "timeseries"
+        title: "Error Rate"
+        query: "sum:trace.express.request.errors{env:production,service:sierra-sync-api}.as_rate()"
+        
+      - type: "heatmap"
+        title: "Response Time Distribution"
+        query: "avg:trace.express.request.duration{env:production,service:sierra-sync-api} by {resource_name}"
+        
+      - type: "query_value"
+        title: "Active Users"
+        query: "sum:custom.users.active{env:production}"
+        
+      - type: "timeseries"
+        title: "Database Query Time"
+        query: "avg:postgresql.query.time{env:production}"
+        
+      - type: "timeseries"
+        title: "Redis Hit Rate"
+        query: "sum:redis.hits{env:production}.as_rate() / (sum:redis.hits{env:production}.as_rate() + sum:redis.misses{env:production}.as_rate())"
+        
+      - type: "timeseries"
+        title: "CPU Usage by Service"
+        query: "avg:kubernetes.cpu.usage.total{namespace:sierra-sync} by {service}"
+        
+      - type: "timeseries"
+        title: "Memory Usage by Service"
+        query: "avg:kubernetes.memory.usage{namespace:sierra-sync} by {service}"
+        
+      - type: "log_stream"
+        title: "Error Logs"
+        query: "status:error env:production service:sierra-sync-*"

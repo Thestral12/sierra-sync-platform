@@ -1,0 +1,474 @@
+{
+  "name": "Sierra Interactive to CRM Real-time Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sierra-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "webhook-listener",
+      "name": "Sierra Webhook Listener",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "sierra-lead-updates"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "GET",
+        "url": "={{ $json.webhook.verification_url }}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Sierra-Token",
+              "value": "={{ $env.SIERRA_API_TOKEN }}"
+            }
+          ]
+        }
+      },
+      "id": "verify-webhook",
+      "name": "Verify Webhook Source",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse and validate Sierra lead data\nconst leadData = $input.item.json;\n\n// Extract and normalize lead information\nconst normalizedLead = {\n  id: leadData.id || leadData.lead_id,\n  firstName: leadData.first_name,\n  lastName: leadData.last_name,\n  email: leadData.email || leadData.email_address,\n  phone: leadData.phone || leadData.phone_number,\n  source: leadData.source || 'Sierra Interactive',\n  score: leadData.lead_score || leadData.score || 0,\n  status: leadData.status || 'new',\n  propertyInterest: leadData.property_interest || [],\n  assignedAgent: leadData.assigned_to,\n  tags: leadData.tags || [],\n  customFields: leadData.custom_fields || {},\n  createdAt: leadData.created_at || new Date().toISOString(),\n  updatedAt: leadData.updated_at || new Date().toISOString(),\n  eventType: leadData.event_type || 'lead.created'\n};\n\n// Validate required fields\nif (!normalizedLead.email && !normalizedLead.phone) {\n  throw new Error('Lead must have either email or phone');\n}\n\nreturn normalizedLead;"
+      },
+      "id": "normalize-lead-data",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "SELECT * FROM tenant_crm_configs WHERE tenant_id = '{{ $json.tenantId }}' AND active = true"
+      },
+      "id": "get-crm-configs",
+      "name": "Get CRM Configurations",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.crm_type }}",
+              "operation": "equals",
+              "value2": "hubspot"
+            }
+          ]
+        }
+      },
+      "id": "route-hubspot",
+      "name": "Route to HubSpot",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.crm_type }}",
+              "operation": "equals",
+              "value2": "salesforce"
+            }
+          ]
+        }
+      },
+      "id": "route-salesforce",
+      "name": "Route to Salesforce",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.crm_type }}",
+              "operation": "equals",
+              "value2": "zoho"
+            }
+          ]
+        }
+      },
+      "id": "route-zoho",
+      "name": "Route to Zoho",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 600]
+    },
+    {
+      "parameters": {
+        "resource": "contact",
+        "operation": "upsert",
+        "email": "={{ $json.email }}",
+        "additionalFields": {
+          "firstName": "={{ $json.firstName }}",
+          "lastName": "={{ $json.lastName }}",
+          "phone": "={{ $json.phone }}",
+          "leadStatus": "={{ $json.status }}",
+          "leadSource": "={{ $json.source }}",
+          "leadScore": "={{ $json.score }}",
+          "customProperties": "={{ $json.customFields }}"
+        }
+      },
+      "id": "sync-to-hubspot",
+      "name": "Sync to HubSpot",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [1250, 200],
+      "credentials": {
+        "hubspotApi": {
+          "id": "2",
+          "name": "HubSpot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "upsert",
+        "leadId": "={{ $json.email }}",
+        "updateFields": {
+          "firstName": "={{ $json.firstName }}",
+          "lastName": "={{ $json.lastName }}",
+          "email": "={{ $json.email }}",
+          "phone": "={{ $json.phone }}",
+          "leadSource": "={{ $json.source }}",
+          "status": "={{ $json.status }}",
+          "company": "Not Specified",
+          "customFields": "={{ $json.customFields }}"
+        }
+      },
+      "id": "sync-to-salesforce",
+      "name": "Sync to Salesforce",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [1250, 400],
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "3",
+          "name": "Salesforce"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "lead",
+        "operation": "upsert",
+        "leadId": "={{ $json.email }}",
+        "additionalFields": {
+          "lastName": "={{ $json.lastName }}",
+          "firstName": "={{ $json.firstName }}",
+          "email": "={{ $json.email }}",
+          "phone": "={{ $json.phone }}",
+          "leadSource": "={{ $json.source }}",
+          "leadStatus": "={{ $json.status }}"
+        }
+      },
+      "id": "sync-to-zoho",
+      "name": "Sync to Zoho",
+      "type": "n8n-nodes-base.zohoCrm",
+      "typeVersion": 1,
+      "position": [1250, 600],
+      "credentials": {
+        "zohoCrmOAuth2Api": {
+          "id": "4",
+          "name": "Zoho CRM"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log sync results\nconst syncResult = {\n  leadId: $input.item.json.id,\n  email: $input.item.json.email,\n  crm: $input.item.json.crm_type,\n  success: $input.item.json.success !== false,\n  syncedAt: new Date().toISOString(),\n  error: $input.item.json.error || null\n};\n\n// Store in database for monitoring\nreturn syncResult;"
+      },
+      "id": "log-sync-results",
+      "name": "Log Sync Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "insert",
+        "table": "sync_logs",
+        "columns": "lead_id,email,crm_type,success,error_message,synced_at",
+        "values": "={{ $json.leadId }},={{ $json.email }},={{ $json.crm }},={{ $json.success }},={{ $json.error }},={{ $json.syncedAt }}"
+      },
+      "id": "store-sync-log",
+      "name": "Store Sync Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1650, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#sales-notifications",
+        "text": "New lead synced from Sierra Interactive:\\n*Name:* {{ $json.firstName }} {{ $json.lastName }}\\n*Email:* {{ $json.email }}\\n*Score:* {{ $json.score }}\\n*Status:* {{ $json.status }}",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "id": "notify-slack",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1650, 200],
+      "credentials": {
+        "slackApi": {
+          "id": "5",
+          "name": "Slack"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.score }}",
+              "operation": "larger",
+              "value2": 80
+            }
+          ]
+        }
+      },
+      "id": "check-high-value",
+      "name": "Check High Value Lead",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications@sierrasync.com",
+        "toEmail": "={{ $json.assignedAgent }}",
+        "subject": "High Value Lead Alert: {{ $json.firstName }} {{ $json.lastName }}",
+        "text": "A high value lead (score: {{ $json.score }}) has been assigned to you.\\n\\nLead Details:\\nName: {{ $json.firstName }} {{ $json.lastName }}\\nEmail: {{ $json.email }}\\nPhone: {{ $json.phone }}\\nProperty Interest: {{ $json.propertyInterest }}\\n\\nPlease follow up within 5 minutes for best results.",
+        "options": {}
+      },
+      "id": "email-agent",
+      "name": "Email Agent Alert",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1650, 100],
+      "credentials": {
+        "smtp": {
+          "id": "6",
+          "name": "SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return {\n  statusCode: 200,\n  body: JSON.stringify({ success: true, message: 'Webhook processed successfully' })\n};"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 400]
+    }
+  ],
+  "connections": {
+    "webhook-listener": {
+      "main": [
+        [
+          {
+            "node": "verify-webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verify-webhook": {
+      "main": [
+        [
+          {
+            "node": "normalize-lead-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize-lead-data": {
+      "main": [
+        [
+          {
+            "node": "get-crm-configs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "check-high-value",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get-crm-configs": {
+      "main": [
+        [
+          {
+            "node": "route-hubspot",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "route-salesforce",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "route-zoho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route-hubspot": {
+      "main": [
+        [
+          {
+            "node": "sync-to-hubspot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route-salesforce": {
+      "main": [
+        [
+          {
+            "node": "sync-to-salesforce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route-zoho": {
+      "main": [
+        [
+          {
+            "node": "sync-to-zoho",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sync-to-hubspot": {
+      "main": [
+        [
+          {
+            "node": "log-sync-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sync-to-salesforce": {
+      "main": [
+        [
+          {
+            "node": "log-sync-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sync-to-zoho": {
+      "main": [
+        [
+          {
+            "node": "log-sync-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log-sync-results": {
+      "main": [
+        [
+          {
+            "node": "store-sync-log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "store-sync-log": {
+      "main": [
+        [
+          {
+            "node": "webhook-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-high-value": {
+      "main": [
+        [
+          {
+            "node": "notify-slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "email-agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "error-handler-workflow"
+  }
+}

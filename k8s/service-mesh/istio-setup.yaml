@@ -1,0 +1,553 @@
+# Istio Service Mesh Configuration for Sierra Sync
+# Advanced traffic management, security, and observability
+
+# Istio namespace and installation handled by istioctl
+# This file contains Sierra Sync specific Istio configurations
+
+---
+# Enable Istio injection for sierra-sync namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sierra-sync
+  labels:
+    istio-injection: enabled
+    name: sierra-sync
+
+---
+# Virtual Service for API traffic management
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: sierra-sync-api
+  namespace: sierra-sync
+spec:
+  hosts:
+    - api.sierrasync.com
+    - sierra-sync-api.sierra-sync.svc.cluster.local
+  gateways:
+    - sierra-sync-gateway
+    - mesh
+  http:
+    # Canary deployment route
+    - match:
+        - headers:
+            x-canary:
+              exact: "true"
+      route:
+        - destination:
+            host: sierra-sync-api-canary.sierra-sync.svc.cluster.local
+            port:
+              number: 3001
+          weight: 100
+    
+    # A/B testing route
+    - match:
+        - headers:
+            x-variant:
+              exact: "b"
+      route:
+        - destination:
+            host: sierra-sync-api-b.sierra-sync.svc.cluster.local
+            port:
+              number: 3001
+          weight: 100
+    
+    # Default traffic split (90/10)
+    - route:
+        - destination:
+            host: sierra-sync-api.sierra-sync.svc.cluster.local
+            port:
+              number: 3001
+          weight: 90
+        - destination:
+            host: sierra-sync-api-canary.sierra-sync.svc.cluster.local
+            port:
+              number: 3001
+          weight: 10
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: gateway-error,connect-failure,refused-stream
+      fault:
+        delay:
+          percentage:
+            value: 0.1
+          fixedDelay: 5s
+      mirror:
+        host: sierra-sync-api-shadow.sierra-sync.svc.cluster.local
+        port:
+          number: 3001
+      mirrorPercentage:
+        value: 1.0
+
+---
+# Destination Rule for load balancing and circuit breaking
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: sierra-sync-api
+  namespace: sierra-sync
+spec:
+  host: sierra-sync-api.sierra-sync.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+        h2UpgradePolicy: UPGRADE
+        useClientProtocol: true
+    loadBalancer:
+      simple: LEAST_REQUEST
+      consistentHash:
+        httpHeaderName: "x-session-id"
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+      splitExternalLocalOriginErrors: true
+    tls:
+      mode: ISTIO_MUTUAL
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 50
+    - name: v2
+      labels:
+        version: v2
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 50
+    - name: canary
+      labels:
+        version: canary
+
+---
+# Gateway for external traffic
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: sierra-sync-gateway
+  namespace: sierra-sync
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*.sierrasync.com"
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "*.sierrasync.com"
+      tls:
+        mode: SIMPLE
+        credentialName: sierra-sync-tls
+        minProtocolVersion: TLSV1_2
+        maxProtocolVersion: TLSV1_3
+        cipherSuites:
+          - ECDHE-RSA-AES256-GCM-SHA384
+          - ECDHE-RSA-AES128-GCM-SHA256
+    - port:
+        number: 15443
+        name: tls-passthrough
+        protocol: TLS
+      hosts:
+        - "*.sierrasync.com"
+      tls:
+        mode: PASSTHROUGH
+
+---
+# Service Entry for external database
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: postgresql-external
+  namespace: sierra-sync
+spec:
+  hosts:
+    - db.sierrasync.com
+  ports:
+    - number: 5432
+      name: postgres
+      protocol: TCP
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Service Entry for external Redis
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: redis-external
+  namespace: sierra-sync
+spec:
+  hosts:
+    - redis.sierrasync.com
+  ports:
+    - number: 6379
+      name: redis
+      protocol: TCP
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Authorization Policy for API access
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: sierra-sync-api-authz
+  namespace: sierra-sync
+spec:
+  selector:
+    matchLabels:
+      app: sierra-sync-api
+  action: ALLOW
+  rules:
+    # Allow health checks
+    - to:
+        - operation:
+            paths: ["/health", "/ready", "/metrics"]
+    
+    # Allow authenticated requests
+    - from:
+        - source:
+            requestPrincipals: ["*"]
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+    
+    # Allow specific services
+    - from:
+        - source:
+            principals: ["cluster.local/ns/sierra-sync/sa/sierra-sync-web"]
+      to:
+        - operation:
+            methods: ["GET", "POST"]
+    
+    # Rate limiting by IP
+    - to:
+        - operation:
+            methods: ["POST"]
+            paths: ["/api/auth/login"]
+      when:
+        - key: source.ip
+          notValues: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+
+---
+# Request Authentication for JWT validation
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: sierra-sync-jwt
+  namespace: sierra-sync
+spec:
+  selector:
+    matchLabels:
+      app: sierra-sync-api
+  jwtRules:
+    - issuer: "https://auth.sierrasync.com"
+      jwksUri: "https://auth.sierrasync.com/.well-known/jwks.json"
+      audiences:
+        - "sierra-sync-api"
+      forwardOriginalToken: true
+      outputPayloadToHeader: "x-jwt-payload"
+
+---
+# PeerAuthentication for mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: sierra-sync-mtls
+  namespace: sierra-sync
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# Rate Limiting with EnvoyFilter
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: rate-limit
+  namespace: sierra-sync
+spec:
+  workloadSelector:
+    labels:
+      app: sierra-sync-api
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.local_ratelimit
+          typed_config:
+            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+            type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            value:
+              stat_prefix: http_local_rate_limiter
+              token_bucket:
+                max_tokens: 1000
+                tokens_per_fill: 1000
+                fill_interval: 60s
+              filter_enabled:
+                runtime_key: local_rate_limit_enabled
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              filter_enforced:
+                runtime_key: local_rate_limit_enforced
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+
+---
+# Telemetry Configuration
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: sierra-sync-metrics
+  namespace: sierra-sync
+spec:
+  metrics:
+    - providers:
+        - name: prometheus
+      dimensions:
+        request_protocol: request.protocol | "unknown"
+        response_code: response.code | 200
+        source_workload: source.workload.name | "unknown"
+        destination_service_name: destination.service.name | "unknown"
+      overrides:
+        - match:
+            metric: REQUEST_COUNT
+          tagOverrides:
+            method:
+              value: request.method
+            uri:
+              value: request.url_path
+        - match:
+            metric: REQUEST_DURATION
+          tagOverrides:
+            method:
+              value: request.method
+    - providers:
+        - name: datadog
+      dimensions:
+        env: "production"
+        service: destination.service.name | "unknown"
+        version: destination.labels["version"] | "unknown"
+
+---
+# Telemetry for distributed tracing
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: sierra-sync-tracing
+  namespace: sierra-sync
+spec:
+  tracing:
+    - providers:
+        - name: jaeger
+      randomSamplingPercentage: 1.0
+      customTags:
+        environment:
+          literal:
+            value: production
+        user_id:
+          header:
+            name: x-user-id
+        organization_id:
+          header:
+            name: x-org-id
+
+---
+# Telemetry for access logging
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: sierra-sync-logging
+  namespace: sierra-sync
+spec:
+  accessLogging:
+    - providers:
+        - name: file
+      filter:
+        expression: 'response.code >= 400 || request.headers["x-debug"] == "true"'
+
+---
+# Sidecar configuration to limit egress
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: sierra-sync-sidecar
+  namespace: sierra-sync
+spec:
+  egress:
+    - hosts:
+        - "./*"
+        - "istio-system/*"
+        - "monitoring/*"
+        - "logging/*"
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY
+
+---
+# Service mesh configuration for database connections
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: postgresql
+  namespace: sierra-sync
+spec:
+  host: db.sierrasync.com
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 20
+        connectTimeout: 30s
+        tcpKeepalive:
+          time: 7200s
+          interval: 75s
+    outlierDetection:
+      consecutiveErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+
+---
+# Service mesh configuration for Redis
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: redis
+  namespace: sierra-sync
+spec:
+  host: redis.sierrasync.com
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 10s
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+
+---
+# Fault injection for testing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: sierra-sync-fault-injection
+  namespace: sierra-sync
+spec:
+  hosts:
+    - sierra-sync-api.sierra-sync.svc.cluster.local
+  http:
+    - match:
+        - headers:
+            x-test-fault:
+              exact: "true"
+      fault:
+        abort:
+          percentage:
+            value: 10
+          httpStatus: 503
+        delay:
+          percentage:
+            value: 10
+          fixedDelay: 5s
+      route:
+        - destination:
+            host: sierra-sync-api.sierra-sync.svc.cluster.local
+
+---
+# WASM plugin for custom logic
+apiVersion: extensions.istio.io/v1alpha1
+kind: WasmPlugin
+metadata:
+  name: sierra-sync-wasm
+  namespace: sierra-sync
+spec:
+  selector:
+    matchLabels:
+      app: sierra-sync-api
+  url: oci://ghcr.io/sierra-sync/wasm-filters/auth-validator:latest
+  phase: AUTHN
+  pluginConfig:
+    validation_rules:
+      - path_prefix: "/api/admin"
+        required_roles: ["admin", "super_admin"]
+      - path_prefix: "/api/user"
+        required_roles: ["user", "admin"]
+  vmConfig:
+    vmId: "sierra-sync-auth"
+    runtime: "envoy.wasm.runtime.v8"
+    code:
+      local:
+        inline_string: |
+          const REQUIRED_HEADERS = ['x-request-id', 'x-correlation-id'];
+          
+          class AuthValidator {
+            onRequestHeaders(headers) {
+              for (const header of REQUIRED_HEADERS) {
+                if (!headers[header]) {
+                  return {action: 'DENY', status: 400, body: `Missing required header: ${header}`};
+                }
+              }
+              return {action: 'CONTINUE'};
+            }
+          }
+
+---
+# Configure distributed rate limiting
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ratelimit-config
+  namespace: sierra-sync
+data:
+  config.yaml: |
+    domain: sierra-sync-ratelimit
+    descriptors:
+      - key: api_type
+        value: public
+        rate_limit:
+          unit: minute
+          requests_per_unit: 100
+      - key: api_type
+        value: authenticated
+        rate_limit:
+          unit: minute
+          requests_per_unit: 1000
+      - key: user_id
+        rate_limit:
+          unit: hour
+          requests_per_unit: 10000

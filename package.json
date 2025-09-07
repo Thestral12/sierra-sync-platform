@@ -1,0 +1,42 @@
+{
+  "name": "sierra-sync-platform",
+  "version": "1.0.0",
+  "description": "SaaS platform for real-time lead syncing between Sierra Interactive and CRMs",
+  "private": true,
+  "workspaces": [
+    "web-ui",
+    "src/api"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "cd src/api && npm run dev",
+    "dev:web": "cd web-ui && npm run dev",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "cd src/api && npm run build",
+    "build:web": "cd web-ui && npm run build",
+    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:e2e": "playwright test",
+    "test:watch": "jest --watch",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "n8n:start": "docker-compose up n8n -d",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "migrate": "supabase migration up"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.5",
+    "concurrently": "^8.2.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.1",
+    "dotenv": "^16.3.1"
+  }
+}

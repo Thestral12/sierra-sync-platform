@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Session - Sierra Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+        <h1 class="text-2xl font-bold mb-4">Session Cleared</h1>
+        <p class="text-gray-600 mb-6">All authentication sessions have been cleared. You can now login fresh.</p>
+        
+        <div class="space-y-4">
+            <a href="login.html" class="block w-full bg-blue-600 text-white text-center py-3 px-4 rounded-lg hover:bg-blue-700">
+                Go to Login Page
+            </a>
+            <a href="index.html" class="block w-full bg-gray-200 text-gray-700 text-center py-3 px-4 rounded-lg hover:bg-gray-300">
+                Go to Homepage
+            </a>
+        </div>
+        
+        <div class="mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p class="text-sm text-green-700">✓ Sessions cleared successfully</p>
+        </div>
+    </div>
+
+    <script>
+        // Clear all session data
+        localStorage.removeItem('sierraSync_session');
+        sessionStorage.removeItem('sierraSync_session');
+        localStorage.removeItem('sierraSync_token');
+        sessionStorage.removeItem('sierraSync_token');
+        localStorage.removeItem('sierraSync_refresh_token');
+        sessionStorage.removeItem('sierraSync_refresh_token');
+        
+        // Clear any cookies
+        document.cookie.split(";").forEach(function(c) { 
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
+        
+        console.log('All sessions cleared');
+    </script>
+</body>
+</html>

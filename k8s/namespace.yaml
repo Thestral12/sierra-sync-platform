@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sierra-sync
+  labels:
+    name: sierra-sync
+    environment: production
+    app: sierra-sync-platform
+    version: v1.0.0
+  annotations:
+    description: "Sierra Sync - Real Estate CRM Automation Platform"
+    contact: "devops@sierrasync.com"
+    cost-center: "engineering"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sierra-sync-staging
+  labels:
+    name: sierra-sync-staging
+    environment: staging
+    app: sierra-sync-platform
+    version: v1.0.0
+  annotations:
+    description: "Sierra Sync Staging Environment"
+    contact: "devops@sierrasync.com"
+    cost-center: "engineering"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sierra-sync-monitoring
+  labels:
+    name: sierra-sync-monitoring
+    environment: production
+    app: monitoring-stack
+    version: v1.0.0
+  annotations:
+    description: "Sierra Sync Monitoring and Observability"
+    contact: "sre@sierrasync.com"
+    cost-center: "operations"

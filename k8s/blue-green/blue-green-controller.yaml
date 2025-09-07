@@ -1,0 +1,576 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blue-green-config
+  namespace: sierra-sync
+  labels:
+    component: blue-green-deployment
+data:
+  config.yaml: |
+    blueGreen:
+      enabled: true
+      strategy: "blue-green"
+      
+      # Traffic management
+      traffic:
+        canaryWeight: 10  # Percentage for canary testing
+        blueWeight: 100
+        greenWeight: 0
+        
+      # Health check configuration
+      healthCheck:
+        path: "/api/health"
+        intervalSeconds: 10
+        timeoutSeconds: 5
+        successThreshold: 3
+        failureThreshold: 2
+        
+      # Rollback configuration
+      rollback:
+        enabled: true
+        automaticOnFailure: true
+        thresholds:
+          errorRate: 5.0  # Percentage
+          responseTime: 500  # Milliseconds
+          
+      # Monitoring
+      monitoring:
+        prometheus:
+          enabled: true
+          metricPrefix: "sierra_sync_"
+        datadog:
+          enabled: true
+          tags: ["env:production", "service:sierra-sync"]
+          
+      # Notification channels
+      notifications:
+        slack:
+          webhookUrl: "${SLACK_WEBHOOK_URL}"
+          channel: "#deployments"
+        email:
+          recipients: ["devops@sierrasync.com"]
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: sierra-sync-api-rollout
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-api
+    component: blue-green-deployment
+  annotations:
+    notifications.argoproj.io/subscribe.on-deployed.slack: deployments
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: alerts
+spec:
+  replicas: 6
+  strategy:
+    blueGreen:
+      # Blue-green strategy configuration
+      activeService: sierra-sync-api-active
+      previewService: sierra-sync-api-preview
+      
+      # Automatic promotion after all checks pass
+      autoPromotionEnabled: false
+      
+      # Scale down old version after successful promotion
+      scaleDownDelaySeconds: 30
+      prePromotionAnalysis:
+        templates:
+          - templateName: sierra-sync-success-rate
+        args:
+          - name: service-name
+            value: sierra-sync-api-preview
+      
+      # Post-promotion analysis
+      postPromotionAnalysis:
+        templates:
+          - templateName: sierra-sync-success-rate
+        args:
+          - name: service-name
+            value: sierra-sync-api-active
+            
+      # Pre-promotion steps
+      prePromotionSteps:
+        - setWeight: 20
+        - pause:
+            duration: 10s
+        - setWeight: 40
+        - pause:
+            duration: 10s
+        - setWeight: 60
+        - pause:
+            duration: 10s
+        - setWeight: 80
+        - pause:
+            duration: 10s
+            
+  selector:
+    matchLabels:
+      app: sierra-sync-api
+  template:
+    metadata:
+      labels:
+        app: sierra-sync-api
+        component: backend
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sierra-sync-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      imagePullSecrets:
+        - name: sierra-sync-registry
+      containers:
+        - name: api
+          image: ghcr.io/sierra-sync/api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: NODE_ENV
+            - name: DEPLOYMENT_VERSION
+              value: "${DEPLOYMENT_VERSION}"
+            - name: DEPLOYMENT_TYPE
+              value: "blue-green"
+          envFrom:
+            - configMapRef:
+                name: sierra-sync-config
+            - secretRef:
+                name: sierra-sync-secrets
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/health/startup
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - sierra-sync-api
+                topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sierra-sync-api-active
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-api
+    component: active-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: sierra-sync-api
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sierra-sync-api-preview
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-api
+    component: preview-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: sierra-sync-api
+
+---
+# Analysis Template for Success Rate
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: sierra-sync-success-rate
+  namespace: sierra-sync
+  labels:
+    component: blue-green-analysis
+spec:
+  args:
+    - name: service-name
+      value: sierra-sync-api-active
+  metrics:
+    - name: success-rate
+      interval: 5m
+      count: 3
+      successCondition: result[0] >= 95
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.sierra-sync-monitoring.svc.cluster.local:9090
+          query: |
+            sum(rate(http_requests_total{service="{{args.service-name}}",status=~"2.."}[5m])) /
+            sum(rate(http_requests_total{service="{{args.service-name}}"}[5m])) * 100
+    - name: avg-response-time
+      interval: 5m
+      count: 3
+      successCondition: result[0] < 500
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.sierra-sync-monitoring.svc.cluster.local:9090
+          query: |
+            histogram_quantile(0.95, 
+              rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[5m])
+            ) * 1000
+    - name: error-rate
+      interval: 5m
+      count: 3
+      successCondition: result[0] < 5
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.sierra-sync-monitoring.svc.cluster.local:9090
+          query: |
+            sum(rate(http_requests_total{service="{{args.service-name}}",status=~"5.."}[5m])) /
+            sum(rate(http_requests_total{service="{{args.service-name}}"}[5m])) * 100
+
+---
+# Canary Analysis Template
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: sierra-sync-canary-analysis
+  namespace: sierra-sync
+  labels:
+    component: canary-analysis
+spec:
+  args:
+    - name: canary-service
+      value: sierra-sync-api-preview
+    - name: stable-service
+      value: sierra-sync-api-active
+  metrics:
+    - name: canary-vs-stable-success-rate
+      interval: 2m
+      count: 5
+      successCondition: result[0] >= 0.95  # Canary should be within 5% of stable
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.sierra-sync-monitoring.svc.cluster.local:9090
+          query: |
+            (
+              sum(rate(http_requests_total{service="{{args.canary-service}}",status=~"2.."}[2m])) /
+              sum(rate(http_requests_total{service="{{args.canary-service}}"}[2m]))
+            ) /
+            (
+              sum(rate(http_requests_total{service="{{args.stable-service}}",status=~"2.."}[2m])) /
+              sum(rate(http_requests_total{service="{{args.stable-service}}"}[2m]))
+            )
+
+---
+# Web Application Rollout
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: sierra-sync-web-rollout
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: blue-green-deployment
+spec:
+  replicas: 6
+  strategy:
+    blueGreen:
+      activeService: sierra-sync-web-active
+      previewService: sierra-sync-web-preview
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 30
+      prePromotionAnalysis:
+        templates:
+          - templateName: sierra-sync-web-health
+        args:
+          - name: service-name
+            value: sierra-sync-web-preview
+  selector:
+    matchLabels:
+      app: sierra-sync-web
+  template:
+    metadata:
+      labels:
+        app: sierra-sync-web
+        component: frontend
+        version: v1.0.0
+    spec:
+      serviceAccountName: sierra-sync-web
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      imagePullSecrets:
+        - name: sierra-sync-registry
+      containers:
+        - name: web
+          image: ghcr.io/sierra-sync/web:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: NODE_ENV
+            - name: DEPLOYMENT_VERSION
+              value: "${DEPLOYMENT_VERSION}"
+            - name: DEPLOYMENT_TYPE
+              value: "blue-green"
+          envFrom:
+            - configMapRef:
+                name: sierra-sync-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sierra-sync-web-active
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: active-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: sierra-sync-web
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sierra-sync-web-preview
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: preview-service
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: sierra-sync-web
+
+---
+# Web Health Check Analysis Template
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: sierra-sync-web-health
+  namespace: sierra-sync
+  labels:
+    component: web-analysis
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: web-availability
+      interval: 30s
+      count: 10
+      successCondition: result == 1
+      failureLimit: 2
+      provider:
+        web:
+          url: "http://{{args.service-name}}.sierra-sync.svc.cluster.local:3000/health"
+          headers:
+            - key: Host
+              value: sierrasync.com
+          timeoutSeconds: 10
+          jsonPath: "{$.status}"
+          successCondition: "result == 'ok'"
+
+---
+# Deployment Workflow
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: sierra-sync-blue-green-workflow
+  namespace: sierra-sync
+  labels:
+    component: deployment-workflow
+spec:
+  entrypoint: blue-green-deploy
+  arguments:
+    parameters:
+      - name: image-tag
+        value: "latest"
+      - name: environment
+        value: "production"
+  templates:
+    - name: blue-green-deploy
+      steps:
+        - - name: pre-deployment-checks
+            template: pre-deployment
+        - - name: update-rollout
+            template: update-image
+            arguments:
+              parameters:
+                - name: image-tag
+                  value: "{{workflow.parameters.image-tag}}"
+        - - name: wait-for-analysis
+            template: wait-analysis
+        - - name: promote-or-rollback
+            template: promotion-decision
+            
+    - name: pre-deployment
+      script:
+        image: curlimages/curl:latest
+        command: [sh]
+        source: |
+          echo "Running pre-deployment checks..."
+          
+          # Check if current deployment is healthy
+          curl -f http://sierra-sync-api-active.sierra-sync.svc.cluster.local:3001/api/health || exit 1
+          
+          # Check database connectivity
+          curl -f http://sierra-sync-api-active.sierra-sync.svc.cluster.local:3001/api/health/db || exit 1
+          
+          # Check Redis connectivity  
+          curl -f http://sierra-sync-api-active.sierra-sync.svc.cluster.local:3001/api/health/cache || exit 1
+          
+          echo "Pre-deployment checks passed!"
+          
+    - name: update-image
+      inputs:
+        parameters:
+          - name: image-tag
+      resource:
+        action: patch
+        manifest: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Rollout
+          metadata:
+            name: sierra-sync-api-rollout
+            namespace: sierra-sync
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: api
+                    image: ghcr.io/sierra-sync/api:{{inputs.parameters.image-tag}}
+                    
+    - name: wait-analysis
+      suspend:
+        duration: "5m"  # Wait for analysis to complete
+        
+    - name: promotion-decision
+      script:
+        image: argoproj/argocd-cli:latest
+        command: [sh]
+        source: |
+          # Check analysis results
+          ANALYSIS_STATUS=$(kubectl get analysisrun -l rollout=sierra-sync-api-rollout -o jsonpath='{.items[0].status.phase}')
+          
+          if [ "$ANALYSIS_STATUS" = "Successful" ]; then
+            echo "Analysis passed, promoting deployment..."
+            kubectl argo rollouts promote sierra-sync-api-rollout -n sierra-sync
+          else
+            echo "Analysis failed, rolling back..."
+            kubectl argo rollouts abort sierra-sync-api-rollout -n sierra-sync
+            exit 1
+          fi

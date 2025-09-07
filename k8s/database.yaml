@@ -1,0 +1,445 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sierra-sync-postgres-primary
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+    component: primary
+    version: "15"
+spec:
+  serviceName: sierra-sync-postgres-primary
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: sierra-sync-postgres
+      component: primary
+  template:
+    metadata:
+      labels:
+        app: sierra-sync-postgres
+        component: primary
+        version: "15"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sierra-sync-postgres
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: DATABASE_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_USERNAME
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-config
+              mountPath: /etc/postgresql/postgresql.conf
+              subPath: postgresql.conf
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+        - name: postgres-exporter
+          image: prometheuscommunity/postgres-exporter:latest
+          ports:
+            - name: metrics
+              containerPort: 9187
+              protocol: TCP
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB)?sslmode=disable"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_USERNAME
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: DATABASE_NAME
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      volumes:
+        - name: postgres-config
+          configMap:
+            name: sierra-sync-postgres-config
+        - name: postgres-init
+          configMap:
+            name: postgres-init-scripts
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - sierra-sync-postgres
+              topologyKey: kubernetes.io/hostname
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+        labels:
+          app: sierra-sync-postgres
+          component: primary
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests:
+            storage: 100Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sierra-sync-postgres-primary
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+    component: primary
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+    - name: metrics
+      port: 9187
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: sierra-sync-postgres
+    component: primary
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sierra-sync-postgres-replica
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+    component: replica
+    version: "15"
+spec:
+  serviceName: sierra-sync-postgres-replica
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: sierra-sync-postgres
+      component: replica
+  template:
+    metadata:
+      labels:
+        app: sierra-sync-postgres
+        component: replica
+        version: "15"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sierra-sync-postgres
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: DATABASE_NAME
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_USERNAME
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_PASSWORD
+            - name: PGUSER
+              value: postgres
+            - name: POSTGRES_PRIMARY_HOST
+              value: sierra-sync-postgres-primary
+            - name: POSTGRES_REPLICA_USER
+              value: replica_user
+            - name: POSTGRES_REPLICA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: POSTGRES_REPLICA_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Wait for primary to be ready
+              until pg_isready -h $POSTGRES_PRIMARY_HOST -U $POSTGRES_USER; do
+                echo "Waiting for primary database..."
+                sleep 2
+              done
+              
+              # Initialize replica if data directory is empty
+              if [ ! -s "$PGDATA/PG_VERSION" ]; then
+                echo "Initializing replica from primary..."
+                pg_basebackup -h $POSTGRES_PRIMARY_HOST -U $POSTGRES_REPLICA_USER -p 5432 -D $PGDATA -Fp -Xs -P -R
+                echo "standby_mode = 'on'" >> $PGDATA/recovery.conf
+                echo "primary_conninfo = 'host=$POSTGRES_PRIMARY_HOST port=5432 user=$POSTGRES_REPLICA_USER password=$POSTGRES_REPLICA_PASSWORD'" >> $PGDATA/recovery.conf
+              fi
+              
+              exec postgres
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-config
+              mountPath: /etc/postgresql/postgresql.conf
+              subPath: postgresql.conf
+        - name: postgres-exporter
+          image: prometheuscommunity/postgres-exporter:latest
+          ports:
+            - name: metrics
+              containerPort: 9187
+              protocol: TCP
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:5432/$(POSTGRES_DB)?sslmode=disable"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_USERNAME
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sierra-sync-secrets
+                  key: DATABASE_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: DATABASE_NAME
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      volumes:
+        - name: postgres-config
+          configMap:
+            name: sierra-sync-postgres-config
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - sierra-sync-postgres
+              topologyKey: kubernetes.io/hostname
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+        labels:
+          app: sierra-sync-postgres
+          component: replica
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests:
+            storage: 100Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sierra-sync-postgres-replica
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+    component: replica
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+    - name: metrics
+      port: 9187
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: sierra-sync-postgres
+    component: replica
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sierra-sync-postgres
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/sierra-sync-postgres-role
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+data:
+  01-init-replica-user.sql: |
+    -- Create replication user for replicas
+    CREATE USER replica_user REPLICATION LOGIN ENCRYPTED PASSWORD 'CHANGE_ME_IN_PRODUCTION';
+    
+    -- Create read-only user for read queries
+    CREATE USER sierra_sync_readonly WITH ENCRYPTED PASSWORD 'CHANGE_ME_IN_PRODUCTION';
+    GRANT CONNECT ON DATABASE sierra_sync TO sierra_sync_readonly;
+    GRANT USAGE ON SCHEMA public TO sierra_sync_readonly;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO sierra_sync_readonly;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO sierra_sync_readonly;
+    
+  02-init-monitoring.sql: |
+    -- Create monitoring user for postgres_exporter
+    CREATE USER postgres_exporter WITH ENCRYPTED PASSWORD 'CHANGE_ME_IN_PRODUCTION';
+    GRANT CONNECT ON DATABASE sierra_sync TO postgres_exporter;
+    GRANT pg_monitor TO postgres_exporter;
+    
+  03-init-extensions.sql: |
+    -- Install required extensions
+    CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+    CREATE EXTENSION IF NOT EXISTS uuid-ossp;
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;

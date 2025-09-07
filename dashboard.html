@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sierra Sync Platform - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .hidden { display: none; }
+    </style>
+    <script src="src/js/auth.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold">🚀 Sierra Sync - Admin Dashboard</h1>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm">
+                        <span class="opacity-75">API Server:</span>
+                        <span class="font-medium">http://localhost:9146</span>
+                    </div>
+                    <a href="main-dashboard.html" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                        Operations Dashboard
+                    </a>
+                    <a href="analytics-dashboard.html" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                        Analytics Dashboard
+                    </a>
+                    <button onclick="auth.logout()" class="bg-red-600 bg-opacity-80 hover:bg-opacity-100 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Status Banner -->
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-8">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse-slow"></div>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-green-800">
+                        System Status: <span class="font-bold">Operational</span> - All services running normally
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Leads Synced -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="users" class="w-5 h-5 text-blue-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Leads Synced</h3>
+                        <p class="text-2xl font-bold text-gray-900" id="totalLeads">2,543</p>
+                        <p class="text-sm text-green-600">
+                            <i data-lucide="trending-up" class="w-3 h-3 inline"></i> +12.5% from last week
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Integrations -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="zap" class="w-5 h-5 text-purple-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Active Integrations</h3>
+                        <p class="text-2xl font-bold text-gray-900">4</p>
+                        <div class="flex gap-1 mt-2">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">HubSpot</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Salesforce</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sync Success Rate -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="check-circle-2" class="w-5 h-5 text-green-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Sync Success Rate</h3>
+                        <p class="text-2xl font-bold text-gray-900">98.7%</p>
+                        <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: 98.7%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Average Sync Time -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-yellow-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="clock" class="w-5 h-5 text-yellow-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Avg Sync Time</h3>
+                        <p class="text-2xl font-bold text-gray-900">1.2s</p>
+                        <p class="text-sm text-green-600">
+                            <i data-lucide="trending-up" class="w-3 h-3 inline"></i> 15% faster than yesterday
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Sync Activity Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Sync Activity (Last 24h)</h3>
+                    <p class="text-sm text-gray-600">Successful vs Failed syncs</p>
+                </div>
+                <div class="relative h-64">
+                    <canvas id="syncChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Lead Flow Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Lead Flow (This Week)</h3>
+                    <p class="text-sm text-gray-600">New leads captured daily</p>
+                </div>
+                <div class="relative h-64">
+                    <canvas id="leadChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Activity Feed -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow mb-8">
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-900">Real-time Activity</h3>
+                <p class="text-sm text-gray-600">Live feed of sync operations</p>
+            </div>
+            <div id="activityFeed" class="space-y-4">
+                <!-- Activity items will be inserted here -->
+            </div>
+        </div>
+
+        <!-- System Health -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- API Health -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">API Health</h3>
+                    <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Response Time</span>
+                        <span class="text-sm font-medium" id="responseTime">Loading...</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Uptime</span>
+                        <span class="text-sm font-medium" id="uptime">Loading...</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Last Check</span>
+                        <span class="text-sm font-medium" id="lastCheck">Now</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Infrastructure Status -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Infrastructure</h3>
+                    <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Redis Cache</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Healthy</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Database</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Healthy</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Queue System</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Healthy</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Deployments -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Recent Deployments</h3>
+                    <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">View All</button>
+                </div>
+                <div class="space-y-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium">Production v2.1.0</p>
+                            <p class="text-xs text-gray-500">2 hours ago</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium">Staging v2.1.1</p>
+                            <p class="text-xs text-gray-500">30 minutes ago</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication and role
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Auth object already initialized with session check in constructor
+            if (!auth.isAuthenticated) {
+                console.log('Not authenticated, redirecting to login');
+                auth.redirectToLogin();
+                return;
+            }
+            
+            // Check if user has admin role
+            const user = auth.currentUser;
+            console.log('Admin dashboard - Current user:', user);
+            
+            if (user.role !== 'admin') {
+                console.log('User role', user.role, 'not admin, redirecting');
+                auth.redirectToDashboard();
+                return;
+            }
+        });
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Initialize charts
+        const syncCtx = document.getElementById('syncChart').getContext('2d');
+        const leadCtx = document.getElementById('leadChart').getContext('2d');
+
+        // Sync Activity Chart
+        new Chart(syncCtx, {
+            type: 'line',
+            data: {
+                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '23:59'],
+                datasets: [{
+                    label: 'Successful',
+                    data: [120, 80, 200, 350, 280, 150, 90],
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Failed',
+                    data: [5, 2, 8, 12, 7, 3, 1],
+                    borderColor: 'rgb(239, 68, 68)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Lead Flow Chart
+        new Chart(leadCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Leads',
+                    data: [45, 52, 38, 65, 72, 43, 36],
+                    backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Real-time activity feed
+        const activities = [
+            { name: 'John Smith', crm: 'HubSpot', status: 'completed', time: '2 seconds ago' },
+            { name: 'Sarah Johnson', crm: 'Salesforce', status: 'processing', time: '5 seconds ago' },
+            { name: 'Mike Wilson', crm: 'Zoho', status: 'completed', time: '12 seconds ago' },
+            { name: 'Emily Davis', crm: 'HubSpot', status: 'completed', time: '18 seconds ago' },
+            { name: 'David Brown', crm: 'Salesforce', status: 'failed', time: '25 seconds ago' }
+        ];
+
+        function renderActivityFeed() {
+            const feed = document.getElementById('activityFeed');
+            feed.innerHTML = activities.map(activity => `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="p-2 rounded-full ${
+                            activity.status === 'completed' ? 'bg-green-100' : 
+                            activity.status === 'failed' ? 'bg-red-100' : 'bg-yellow-100'
+                        }">
+                            ${activity.status === 'completed' ? 
+                                '<i data-lucide="check-circle-2" class="w-4 h-4 text-green-600"></i>' : 
+                                activity.status === 'failed' ? 
+                                '<i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i>' :
+                                '<i data-lucide="activity" class="w-4 h-4 text-yellow-600"></i>'
+                            }
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium">${activity.name} → ${activity.crm}</p>
+                            <p class="text-xs text-gray-500">${activity.time}</p>
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        activity.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                        activity.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                    }">
+                        ${activity.status}
+                    </span>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // Check API health
+        async function checkAPIHealth() {
+            try {
+                const start = Date.now();
+                const response = await fetch('http://localhost:9146/health');
+                const data = await response.json();
+                const responseTime = Date.now() - start;
+                
+                document.getElementById('responseTime').textContent = responseTime + 'ms';
+                document.getElementById('uptime').textContent = Math.floor(data.uptime) + 's';
+                document.getElementById('lastCheck').textContent = 'Just now';
+            } catch (error) {
+                document.getElementById('responseTime').textContent = 'Error';
+                document.getElementById('uptime').textContent = 'Offline';
+            }
+        }
+
+        // Update total leads counter
+        function updateMetrics() {
+            const totalLeadsEl = document.getElementById('totalLeads');
+            let current = parseInt(totalLeadsEl.textContent.replace(',', ''));
+            current += Math.floor(Math.random() * 3);
+            totalLeadsEl.textContent = current.toLocaleString();
+        }
+
+        // Initialize
+        renderActivityFeed();
+        checkAPIHealth();
+        
+        // Auto-refresh
+        setInterval(checkAPIHealth, 30000); // Every 30 seconds
+        setInterval(updateMetrics, 10000); // Every 10 seconds
+        setInterval(() => {
+            // Update activity feed with new random activity
+            activities.unshift({
+                name: `User ${Math.floor(Math.random() * 1000)}`,
+                crm: ['HubSpot', 'Salesforce', 'Zoho'][Math.floor(Math.random() * 3)],
+                status: ['completed', 'processing', 'failed'][Math.floor(Math.random() * 3)],
+                time: 'Just now'
+            });
+            if (activities.length > 5) activities.pop();
+            renderActivityFeed();
+        }, 15000); // Every 15 seconds
+    </script>
+</body>
+</html>

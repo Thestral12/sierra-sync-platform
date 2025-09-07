@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Auth - Sierra Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="src/js/auth.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">Authentication Debug</h1>
+        
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Raw Storage Data</h2>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-semibold">localStorage:</h3>
+                    <pre id="localStorageData" class="bg-gray-100 p-2 rounded text-sm overflow-x-auto"></pre>
+                </div>
+                <div>
+                    <h3 class="font-semibold">sessionStorage:</h3>
+                    <pre id="sessionStorageData" class="bg-gray-100 p-2 rounded text-sm overflow-x-auto"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Auth Object State</h2>
+            <pre id="authState" class="bg-gray-100 p-4 rounded text-sm overflow-x-auto"></pre>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Methods</h2>
+            <div class="space-y-4">
+                <div>
+                    <button onclick="testCheckSession()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2">
+                        Test checkSession()
+                    </button>
+                    <span id="checkSessionResult"></span>
+                </div>
+                <div>
+                    <button onclick="testGetCurrentUser()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mr-2">
+                        Test getCurrentUser()
+                    </button>
+                    <span id="getCurrentUserResult"></span>
+                </div>
+                <div>
+                    <button onclick="testHasRole()" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 mr-2">
+                        Test hasRole()
+                    </button>
+                    <span id="hasRoleResult"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Quick Login</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <button onclick="quickLogin('operations')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Login as Operations
+                </button>
+                <button onclick="quickLogin('admin')" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                    Login as Admin
+                </button>
+                <button onclick="quickLogin('analytics')" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    Login as Analytics
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4">Console Output</h2>
+            <pre id="consoleOutput" class="bg-gray-900 text-green-400 p-4 rounded text-sm overflow-x-auto font-mono h-48 overflow-y-auto"></pre>
+        </div>
+    </div>
+
+    <script>
+        const consoleOutput = document.getElementById('consoleOutput');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        // Override console to capture output
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logToOutput('LOG', args);
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logToOutput('ERROR', args);
+        };
+        
+        function logToOutput(type, args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+            ).join(' ');
+            consoleOutput.textContent += `[${timestamp}] ${type}: ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        function displayStorageData() {
+            // Display localStorage
+            const localData = {};
+            for (let key in localStorage) {
+                if (key.startsWith('sierraSync')) {
+                    try {
+                        localData[key] = JSON.parse(localStorage.getItem(key));
+                    } catch {
+                        localData[key] = localStorage.getItem(key);
+                    }
+                }
+            }
+            document.getElementById('localStorageData').textContent = JSON.stringify(localData, null, 2) || 'Empty';
+            
+            // Display sessionStorage
+            const sessionData = {};
+            for (let key in sessionStorage) {
+                if (key.startsWith('sierraSync')) {
+                    try {
+                        sessionData[key] = JSON.parse(sessionStorage.getItem(key));
+                    } catch {
+                        sessionData[key] = sessionStorage.getItem(key);
+                    }
+                }
+            }
+            document.getElementById('sessionStorageData').textContent = JSON.stringify(sessionData, null, 2) || 'Empty';
+        }
+        
+        function displayAuthState() {
+            const authState = {
+                isAuthenticated: auth.isAuthenticated,
+                currentUser: auth.currentUser,
+                sessionKey: auth.sessionKey,
+                tokenKey: auth.tokenKey,
+                refreshTokenKey: auth.refreshTokenKey,
+                dashboards: auth.dashboards
+            };
+            document.getElementById('authState').textContent = JSON.stringify(authState, null, 2);
+        }
+        
+        function testCheckSession() {
+            console.log('Testing checkSession()...');
+            const result = auth.checkSession();
+            document.getElementById('checkSessionResult').textContent = `Result: ${result}`;
+            console.log('checkSession result:', result);
+            displayAuthState();
+            displayStorageData();
+        }
+        
+        async function testGetCurrentUser() {
+            console.log('Testing getCurrentUser()...');
+            try {
+                const user = await auth.getCurrentUser();
+                document.getElementById('getCurrentUserResult').textContent = `Success: ${JSON.stringify(user)}`;
+                console.log('getCurrentUser result:', user);
+            } catch (error) {
+                document.getElementById('getCurrentUserResult').textContent = `Error: ${error.message}`;
+                console.error('getCurrentUser error:', error);
+            }
+            displayAuthState();
+        }
+        
+        function testHasRole() {
+            console.log('Testing hasRole()...');
+            const roles = ['admin', 'operations', 'analytics'];
+            const results = {};
+            roles.forEach(role => {
+                results[role] = auth.hasRole(role);
+            });
+            document.getElementById('hasRoleResult').textContent = JSON.stringify(results);
+            console.log('hasRole results:', results);
+        }
+        
+        function quickLogin(role) {
+            const users = {
+                'operations': {
+                    email: 'demo@sierrasync.com',
+                    name: 'Demo User',
+                    dashboard: 'main-dashboard.html'
+                },
+                'admin': {
+                    email: 'admin@sierrasync.com',
+                    name: 'Admin User',
+                    dashboard: 'dashboard.html'
+                },
+                'analytics': {
+                    email: 'analytics@sierrasync.com',
+                    name: 'Analytics User',
+                    dashboard: 'analytics-dashboard.html'
+                }
+            };
+            
+            const user = users[role];
+            const sessionData = {
+                id: Math.floor(Math.random() * 10000),
+                email: user.email,
+                name: user.name,
+                role: role,
+                dashboard: user.dashboard,
+                loginTime: new Date().toISOString()
+            };
+            
+            // Clear existing sessions
+            localStorage.removeItem('sierraSync_session');
+            sessionStorage.removeItem('sierraSync_session');
+            localStorage.removeItem('sierraSync_token');
+            sessionStorage.removeItem('sierraSync_token');
+            
+            // Store new session (using sessionStorage for testing)
+            sessionStorage.setItem('sierraSync_session', JSON.stringify(sessionData));
+            sessionStorage.setItem('sierraSync_token', 'test_token_' + Date.now());
+            
+            console.log(`Logged in as ${role}:`, sessionData);
+            
+            // Reinitialize auth
+            window.auth = new SierraSyncAuth();
+            
+            // Refresh displays
+            displayStorageData();
+            displayAuthState();
+        }
+        
+        // Initial display
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, initializing debug view...');
+            displayStorageData();
+            displayAuthState();
+            
+            // Test initial state
+            console.log('Initial auth.isAuthenticated:', auth.isAuthenticated);
+            console.log('Initial auth.currentUser:', auth.currentUser);
+        });
+    </script>
+</body>
+</html>

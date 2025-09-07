@@ -1,0 +1,383 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sierra-sync-api-ingress
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-api
+    component: ingress
+  annotations:
+    # AWS Load Balancer Controller annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERTIFICATE_ID
+    
+    # Security headers
+    alb.ingress.kubernetes.io/response-headers: |
+      Strict-Transport-Security: max-age=31536000; includeSubDomains
+      X-Frame-Options: DENY
+      X-Content-Type-Options: nosniff
+      X-XSS-Protection: 1; mode=block
+      Referrer-Policy: strict-origin-when-cross-origin
+      Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' https:; object-src 'none'; media-src 'self'; frame-ancestors 'none';
+    
+    # Rate limiting and WAF
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:us-east-1:ACCOUNT_ID:regional/webacl/sierra-sync-waf/WAF_ID
+    alb.ingress.kubernetes.io/shield-advanced-protection: "true"
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    
+    # Load balancing
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=sierra-sync-alb-logs,
+      access_logs.s3.prefix=api-ingress
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: |
+      Environment=production,
+      Application=sierra-sync,
+      Component=api,
+      Team=platform
+spec:
+  rules:
+    - host: api.sierrasync.com
+      http:
+        paths:
+          - path: /api/health
+            pathType: Exact
+            backend:
+              service:
+                name: sierra-sync-api
+                port:
+                  number: 3001
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-api
+                port:
+                  number: 3001
+          - path: /api/oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-api
+                port:
+                  number: 3001
+          - path: /api/webhooks
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-api
+                port:
+                  number: 3001
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-api
+                port:
+                  number: 3001
+  tls:
+    - hosts:
+        - api.sierrasync.com
+      secretName: sierra-sync-api-tls
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sierra-sync-web-ingress
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: ingress
+  annotations:
+    # AWS Load Balancer Controller annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERTIFICATE_ID
+    
+    # Security headers
+    alb.ingress.kubernetes.io/response-headers: |
+      Strict-Transport-Security: max-age=31536000; includeSubDomains
+      X-Frame-Options: SAMEORIGIN
+      X-Content-Type-Options: nosniff
+      X-XSS-Protection: 1; mode=block
+      Referrer-Policy: strict-origin-when-cross-origin
+      Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.sierrasync.com wss://api.sierrasync.com; frame-ancestors 'self';
+    
+    # Caching for static assets
+    alb.ingress.kubernetes.io/actions.static-cache: |
+      {
+        "type": "fixed-response",
+        "fixedResponseConfig": {
+          "contentType": "text/plain",
+          "statusCode": "200",
+          "messageBody": "OK"
+        }
+      }
+    
+    # Rate limiting and WAF
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:us-east-1:ACCOUNT_ID:regional/webacl/sierra-sync-waf/WAF_ID
+    alb.ingress.kubernetes.io/shield-advanced-protection: "true"
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    
+    # Load balancing
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=sierra-sync-alb-logs,
+      access_logs.s3.prefix=web-ingress
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: |
+      Environment=production,
+      Application=sierra-sync,
+      Component=web,
+      Team=platform
+spec:
+  rules:
+    - host: sierrasync.com
+      http:
+        paths:
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: sierra-sync-web
+                port:
+                  number: 3000
+          - path: /static
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-web
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-web
+                port:
+                  number: 3000
+    - host: www.sierrasync.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-web
+                port:
+                  number: 3000
+  tls:
+    - hosts:
+        - sierrasync.com
+        - www.sierrasync.com
+      secretName: sierra-sync-web-tls
+
+---
+# Internal ingress for admin/monitoring tools
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sierra-sync-admin-ingress
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-admin
+    component: ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERTIFICATE_ID
+    
+    # IP whitelist for admin access
+    alb.ingress.kubernetes.io/inbound-cidrs: 10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+    
+    # Auth required
+    alb.ingress.kubernetes.io/auth-type: oidc
+    alb.ingress.kubernetes.io/auth-idp-oidc: |
+      {
+        "issuer": "https://auth.sierrasync.com",
+        "authorizationEndpoint": "https://auth.sierrasync.com/oauth2/authorize",
+        "tokenEndpoint": "https://auth.sierrasync.com/oauth2/token",
+        "userInfoEndpoint": "https://auth.sierrasync.com/oauth2/userinfo",
+        "secretName": "admin-oidc-secret"
+      }
+    
+    # Tags
+    alb.ingress.kubernetes.io/tags: |
+      Environment=production,
+      Application=sierra-sync,
+      Component=admin,
+      Access=internal
+spec:
+  rules:
+    - host: admin.internal.sierrasync.com
+      http:
+        paths:
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-api
+                port:
+                  number: 3001
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: sierra-sync-api
+                port:
+                  number: 9090
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+  tls:
+    - hosts:
+        - admin.internal.sierrasync.com
+      secretName: sierra-sync-admin-tls
+
+---
+# Network policies for ingress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sierra-sync-ingress-netpol
+  namespace: sierra-sync
+  labels:
+    component: security
+spec:
+  podSelector:
+    matchLabels:
+      app: sierra-sync-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 3001
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: sierra-sync-monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sierra-sync-postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sierra-sync-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+        - protocol: UDP
+          port: 53
+
+---
+# Rate limiting configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-rate-limits
+  namespace: sierra-sync
+  labels:
+    component: security
+data:
+  nginx.conf: |
+    # Rate limiting zones
+    limit_req_zone $binary_remote_addr zone=api_general:10m rate=100r/s;
+    limit_req_zone $binary_remote_addr zone=api_auth:10m rate=5r/m;
+    limit_req_zone $binary_remote_addr zone=api_webhooks:10m rate=1000r/s;
+    limit_req_zone $binary_remote_addr zone=web_general:10m rate=50r/s;
+    
+    # Connection limiting
+    limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+    
+    # Custom log format
+    log_format sierra_sync_format '$remote_addr - $remote_user [$time_local] '
+                                   '"$request" $status $body_bytes_sent '
+                                   '"$http_referer" "$http_user_agent" '
+                                   '$request_time $upstream_response_time '
+                                   '$upstream_addr $upstream_status';
+    
+    server {
+        # Rate limiting rules
+        location /api/auth/ {
+            limit_req zone=api_auth burst=10 nodelay;
+            limit_conn conn_limit 5;
+        }
+        
+        location /api/webhooks/ {
+            limit_req zone=api_webhooks burst=100 nodelay;
+            limit_conn conn_limit 10;
+        }
+        
+        location /api/ {
+            limit_req zone=api_general burst=50 nodelay;
+            limit_conn conn_limit 20;
+        }
+        
+        location / {
+            limit_req zone=web_general burst=20 nodelay;
+            limit_conn conn_limit 10;
+        }
+    }

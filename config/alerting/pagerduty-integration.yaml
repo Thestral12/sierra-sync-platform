@@ -1,0 +1,251 @@
+# PagerDuty Integration for Sierra Sync
+# Incident management and on-call scheduling
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pagerduty-secrets
+  namespace: sierra-sync
+type: Opaque
+stringData:
+  integration-key: ${PAGERDUTY_INTEGRATION_KEY}
+  api-key: ${PAGERDUTY_API_KEY}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pagerduty-config
+  namespace: sierra-sync
+data:
+  config.yaml: |
+    # PagerDuty Configuration
+    pagerduty:
+      # API Configuration
+      api:
+        key: ${PAGERDUTY_API_KEY}
+        base_url: https://api.pagerduty.com
+        
+      # Services Configuration
+      services:
+        - name: sierra-sync-production
+          integration_key: ${PAGERDUTY_INTEGRATION_KEY}
+          escalation_policy: P1-Production
+          
+        - name: sierra-sync-staging
+          integration_key: ${PAGERDUTY_STAGING_KEY}
+          escalation_policy: P2-Staging
+          
+      # Incident Priorities
+      priorities:
+        - name: P1-Critical
+          description: Complete service outage or data loss
+          color: "#FF0000"
+          
+        - name: P2-High
+          description: Significant degradation or partial outage
+          color: "#FF9900"
+          
+        - name: P3-Medium
+          description: Minor degradation or non-critical issue
+          color: "#FFFF00"
+          
+        - name: P4-Low
+          description: Cosmetic or minor issue
+          color: "#00FF00"
+          
+      # Alert Rules
+      alert_rules:
+        # Critical Alerts (P1)
+        - name: "API Complete Outage"
+          condition: |
+            service == "sierra-sync-api" AND
+            availability < 50 AND
+            duration > 60
+          priority: P1-Critical
+          escalate_after: 5m
+          
+        - name: "Database Connection Lost"
+          condition: |
+            service == "postgresql" AND
+            status == "down" AND
+            duration > 30
+          priority: P1-Critical
+          escalate_after: 5m
+          
+        - name: "Data Loss Detected"
+          condition: |
+            alert_name == "data_loss" OR
+            alert_name == "backup_failure"
+          priority: P1-Critical
+          escalate_after: 0m
+          
+        # High Priority Alerts (P2)
+        - name: "High Error Rate"
+          condition: |
+            error_rate > 10 AND
+            duration > 300
+          priority: P2-High
+          escalate_after: 15m
+          
+        - name: "Response Time Degradation"
+          condition: |
+            p95_latency > 2000 AND
+            duration > 600
+          priority: P2-High
+          escalate_after: 15m
+          
+        - name: "Redis Cluster Unhealthy"
+          condition: |
+            service == "redis" AND
+            (status == "degraded" OR replicas < 2)
+          priority: P2-High
+          escalate_after: 10m
+          
+        # Medium Priority Alerts (P3)
+        - name: "High Memory Usage"
+          condition: |
+            memory_usage > 85 AND
+            duration > 1800
+          priority: P3-Medium
+          escalate_after: 30m
+          
+        - name: "Disk Space Warning"
+          condition: |
+            disk_usage > 80 AND
+            duration > 3600
+          priority: P3-Medium
+          escalate_after: 60m
+          
+        - name: "Certificate Expiry Warning"
+          condition: |
+            days_until_expiry < 30 AND
+            days_until_expiry > 7
+          priority: P3-Medium
+          escalate_after: 120m
+          
+        # Low Priority Alerts (P4)
+        - name: "Scheduled Maintenance"
+          condition: |
+            alert_type == "maintenance"
+          priority: P4-Low
+          escalate_after: never
+          
+      # Incident Templates
+      incident_templates:
+        - name: "API Outage"
+          title: "🚨 API Service Outage - {{service}}"
+          description: |
+            Service: {{service}}
+            Environment: {{environment}}
+            Region: {{region}}
+            Start Time: {{start_time}}
+            Error Rate: {{error_rate}}%
+            Affected Users: {{affected_users}}
+            
+            Initial Investigation:
+            - Check service health: {{health_check_url}}
+            - View logs: {{logs_url}}
+            - Check metrics: {{metrics_url}}
+          
+        - name: "Database Issue"
+          title: "🗃️ Database Issue - {{database}}"
+          description: |
+            Database: {{database}}
+            Type: {{issue_type}}
+            Severity: {{severity}}
+            Connection Pool: {{connection_pool_usage}}%
+            Active Queries: {{active_queries}}
+            Replication Lag: {{replication_lag}}s
+            
+            Troubleshooting Steps:
+            1. Check connection pool
+            2. Review slow queries
+            3. Check replication status
+            4. Review recent deployments
+            
+      # Runbook Links
+      runbooks:
+        api_outage: https://wiki.sierrasync.com/runbooks/api-outage
+        database_issues: https://wiki.sierrasync.com/runbooks/database-issues
+        redis_failover: https://wiki.sierrasync.com/runbooks/redis-failover
+        deployment_rollback: https://wiki.sierrasync.com/runbooks/deployment-rollback
+        ssl_renewal: https://wiki.sierrasync.com/runbooks/ssl-renewal
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pagerduty-webhook
+  namespace: sierra-sync
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pagerduty-webhook
+  template:
+    metadata:
+      labels:
+        app: pagerduty-webhook
+    spec:
+      containers:
+        - name: webhook
+          image: sierrasync/pagerduty-webhook:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PAGERDUTY_INTEGRATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagerduty-secrets
+                  key: integration-key
+            - name: PAGERDUTY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagerduty-secrets
+                  key: api-key
+            - name: LOG_LEVEL
+              value: "info"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pagerduty
+              readOnly: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: pagerduty-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pagerduty-webhook
+  namespace: sierra-sync
+spec:
+  type: ClusterIP
+  selector:
+    app: pagerduty-webhook
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

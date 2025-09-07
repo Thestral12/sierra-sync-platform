@@ -1,0 +1,435 @@
+# Prometheus Alert Rules for Sierra Sync
+# Comprehensive alerting configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alerts
+  namespace: monitoring
+data:
+  alerts.yml: |
+    groups:
+      # API and Application Alerts
+      - name: api_alerts
+        interval: 30s
+        rules:
+          - alert: APIHighErrorRate
+            expr: |
+              (
+                sum(rate(http_requests_total{job="sierra-sync-api",status=~"5.."}[5m]))
+                /
+                sum(rate(http_requests_total{job="sierra-sync-api"}[5m]))
+              ) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+              service: api
+              team: platform
+            annotations:
+              summary: "High error rate on API ({{ $value | humanizePercentage }})"
+              description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+              runbook_url: "https://wiki.sierrasync.com/runbooks/api-high-error-rate"
+              
+          - alert: APIHighLatency
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(http_request_duration_seconds_bucket{job="sierra-sync-api"}[5m])) by (le)
+              ) > 1
+            for: 10m
+            labels:
+              severity: warning
+              service: api
+              team: platform
+            annotations:
+              summary: "High API latency (p95: {{ $value | humanizeDuration }})"
+              description: "95th percentile latency is {{ $value | humanizeDuration }} (threshold: 1s)"
+              
+          - alert: APIDown
+            expr: up{job="sierra-sync-api"} == 0
+            for: 1m
+            labels:
+              severity: critical
+              service: api
+              team: platform
+              pagerduty: true
+            annotations:
+              summary: "API instance down"
+              description: "API instance {{ $labels.instance }} has been down for more than 1 minute"
+              
+          - alert: APITrafficSpike
+            expr: |
+              rate(http_requests_total{job="sierra-sync-api"}[5m]) 
+              > 
+              avg_over_time(rate(http_requests_total{job="sierra-sync-api"}[5m])[1h:5m]) * 3
+            for: 5m
+            labels:
+              severity: warning
+              service: api
+              team: platform
+            annotations:
+              summary: "Unusual traffic spike detected"
+              description: "API traffic is 3x higher than the hourly average"
+              
+      # Database Alerts
+      - name: database_alerts
+        interval: 30s
+        rules:
+          - alert: DatabaseDown
+            expr: pg_up == 0
+            for: 1m
+            labels:
+              severity: critical
+              service: database
+              team: platform
+              pagerduty: true
+            annotations:
+              summary: "PostgreSQL database is down"
+              description: "Database instance {{ $labels.instance }} is not responding"
+              
+          - alert: DatabaseHighConnections
+            expr: |
+              (pg_stat_database_numbackends / pg_settings_max_connections) > 0.8
+            for: 5m
+            labels:
+              severity: warning
+              service: database
+              team: platform
+            annotations:
+              summary: "Database connection pool near limit"
+              description: "Database using {{ $value | humanizePercentage }} of max connections"
+              
+          - alert: DatabaseReplicationLag
+            expr: pg_replication_lag_seconds > 10
+            for: 5m
+            labels:
+              severity: warning
+              service: database
+              team: platform
+            annotations:
+              summary: "High database replication lag"
+              description: "Replication lag is {{ $value | humanizeDuration }} (threshold: 10s)"
+              
+          - alert: DatabaseSlowQueries
+            expr: |
+              rate(pg_stat_database_blks_hit{datname="sierra_sync"}[5m]) 
+              / 
+              rate(pg_stat_database_blks_read{datname="sierra_sync"}[5m]) < 0.9
+            for: 10m
+            labels:
+              severity: warning
+              service: database
+              team: platform
+            annotations:
+              summary: "Low database cache hit ratio"
+              description: "Cache hit ratio is {{ $value | humanizePercentage }} (threshold: 90%)"
+              
+          - alert: DatabaseLockWaits
+            expr: pg_locks_count{mode="ExclusiveLock"} > 10
+            for: 5m
+            labels:
+              severity: warning
+              service: database
+              team: platform
+            annotations:
+              summary: "High number of database locks"
+              description: "{{ $value }} exclusive locks detected"
+              
+      # Redis Alerts
+      - name: redis_alerts
+        interval: 30s
+        rules:
+          - alert: RedisDown
+            expr: redis_up == 0
+            for: 1m
+            labels:
+              severity: critical
+              service: redis
+              team: platform
+              pagerduty: true
+            annotations:
+              summary: "Redis instance down"
+              description: "Redis instance {{ $labels.instance }} is not responding"
+              
+          - alert: RedisHighMemory
+            expr: |
+              (redis_memory_used_bytes / redis_memory_max_bytes) > 0.9
+            for: 5m
+            labels:
+              severity: warning
+              service: redis
+              team: platform
+            annotations:
+              summary: "Redis memory usage high"
+              description: "Redis using {{ $value | humanizePercentage }} of max memory"
+              
+          - alert: RedisMasterLost
+            expr: |
+              changes(redis_instance_info{role="master"}[5m]) > 0
+            labels:
+              severity: critical
+              service: redis
+              team: platform
+              pagerduty: true
+            annotations:
+              summary: "Redis master failover detected"
+              description: "Redis master has changed, possible failover event"
+              
+          - alert: RedisHighEvictions
+            expr: |
+              rate(redis_evicted_keys_total[5m]) > 100
+            for: 5m
+            labels:
+              severity: warning
+              service: redis
+              team: platform
+            annotations:
+              summary: "High Redis key eviction rate"
+              description: "Redis evicting {{ $value }} keys per second"
+              
+      # Kubernetes Alerts
+      - name: kubernetes_alerts
+        interval: 30s
+        rules:
+          - alert: PodCrashLooping
+            expr: |
+              rate(kube_pod_container_status_restarts_total{namespace="sierra-sync"}[5m]) > 0
+            for: 5m
+            labels:
+              severity: warning
+              service: kubernetes
+              team: platform
+            annotations:
+              summary: "Pod {{ $labels.pod }} is crash looping"
+              description: "Pod has restarted {{ $value }} times in the last 5 minutes"
+              
+          - alert: PodNotReady
+            expr: |
+              kube_pod_status_ready{namespace="sierra-sync",condition="false"} == 1
+            for: 5m
+            labels:
+              severity: warning
+              service: kubernetes
+              team: platform
+            annotations:
+              summary: "Pod {{ $labels.pod }} is not ready"
+              description: "Pod has been not ready for more than 5 minutes"
+              
+          - alert: DeploymentReplicasNotMatched
+            expr: |
+              kube_deployment_spec_replicas{namespace="sierra-sync"}
+              !=
+              kube_deployment_status_replicas_available{namespace="sierra-sync"}
+            for: 10m
+            labels:
+              severity: warning
+              service: kubernetes
+              team: platform
+            annotations:
+              summary: "Deployment {{ $labels.deployment }} replica mismatch"
+              description: "Deployment has {{ $value }} replicas but expects different number"
+              
+          - alert: NodeMemoryPressure
+            expr: |
+              kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+            for: 5m
+            labels:
+              severity: warning
+              service: kubernetes
+              team: infrastructure
+            annotations:
+              summary: "Node {{ $labels.node }} under memory pressure"
+              description: "Node is experiencing memory pressure"
+              
+          - alert: NodeDiskPressure
+            expr: |
+              kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+            for: 5m
+            labels:
+              severity: warning
+              service: kubernetes
+              team: infrastructure
+            annotations:
+              summary: "Node {{ $labels.node }} under disk pressure"
+              description: "Node is experiencing disk pressure"
+              
+          - alert: PVCNearFull
+            expr: |
+              (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) > 0.85
+            for: 5m
+            labels:
+              severity: warning
+              service: kubernetes
+              team: platform
+            annotations:
+              summary: "PVC {{ $labels.persistentvolumeclaim }} near full"
+              description: "PVC is {{ $value | humanizePercentage }} full"
+              
+      # Infrastructure Alerts
+      - name: infrastructure_alerts
+        interval: 30s
+        rules:
+          - alert: HighCPUUsage
+            expr: |
+              (
+                100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+              ) > 85
+            for: 10m
+            labels:
+              severity: warning
+              service: infrastructure
+              team: infrastructure
+            annotations:
+              summary: "High CPU usage on {{ $labels.instance }}"
+              description: "CPU usage is {{ $value | humanize }}%"
+              
+          - alert: HighMemoryUsage
+            expr: |
+              (
+                (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+                / node_memory_MemTotal_bytes
+              ) > 0.9
+            for: 5m
+            labels:
+              severity: warning
+              service: infrastructure
+              team: infrastructure
+            annotations:
+              summary: "High memory usage on {{ $labels.instance }}"
+              description: "Memory usage is {{ $value | humanizePercentage }}"
+              
+          - alert: DiskSpaceLow
+            expr: |
+              (
+                node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"}
+                / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat"}
+              ) < 0.15
+            for: 5m
+            labels:
+              severity: warning
+              service: infrastructure
+              team: infrastructure
+            annotations:
+              summary: "Low disk space on {{ $labels.instance }}"
+              description: "Only {{ $value | humanizePercentage }} disk space remaining on {{ $labels.device }}"
+              
+          - alert: NetworkInterfaceDown
+            expr: |
+              node_network_up{device!~"lo|docker.*|veth.*"} == 0
+            for: 5m
+            labels:
+              severity: critical
+              service: infrastructure
+              team: infrastructure
+            annotations:
+              summary: "Network interface {{ $labels.device }} down"
+              description: "Network interface {{ $labels.device }} on {{ $labels.instance }} is down"
+              
+      # Certificate Alerts
+      - name: certificate_alerts
+        interval: 1h
+        rules:
+          - alert: SSLCertificateExpiringSoon
+            expr: |
+              probe_ssl_earliest_cert_expiry - time() < 7 * 86400
+            for: 1h
+            labels:
+              severity: critical
+              service: security
+              team: platform
+              pagerduty: true
+            annotations:
+              summary: "SSL certificate expiring soon"
+              description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+              
+          - alert: SSLCertificateExpiryWarning
+            expr: |
+              probe_ssl_earliest_cert_expiry - time() < 30 * 86400
+            for: 1h
+            labels:
+              severity: warning
+              service: security
+              team: platform
+            annotations:
+              summary: "SSL certificate expiry warning"
+              description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+              
+      # Business Metrics Alerts
+      - name: business_alerts
+        interval: 1m
+        rules:
+          - alert: LowActiveUsers
+            expr: |
+              sierra_sync_active_users < 100
+            for: 30m
+            labels:
+              severity: info
+              service: business
+              team: product
+            annotations:
+              summary: "Low active user count"
+              description: "Only {{ $value }} active users in the last 30 minutes"
+              
+          - alert: HighChurnRate
+            expr: |
+              rate(sierra_sync_user_churn_total[1d]) > 0.05
+            for: 1h
+            labels:
+              severity: warning
+              service: business
+              team: product
+            annotations:
+              summary: "High user churn rate"
+              description: "User churn rate is {{ $value | humanizePercentage }} per day"
+              
+          - alert: PaymentProcessingFailures
+            expr: |
+              rate(sierra_sync_payment_failures_total[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: critical
+              service: payments
+              team: platform
+              pagerduty: true
+            annotations:
+              summary: "High payment failure rate"
+              description: "Payment failure rate is {{ $value | humanize }} per second"
+              
+      # Security Alerts
+      - name: security_alerts
+        interval: 30s
+        rules:
+          - alert: HighFailedLoginAttempts
+            expr: |
+              rate(sierra_sync_failed_login_attempts_total[5m]) > 10
+            for: 5m
+            labels:
+              severity: warning
+              service: security
+              team: security
+            annotations:
+              summary: "High failed login attempt rate"
+              description: "{{ $value | humanize }} failed login attempts per second"
+              
+          - alert: SuspiciousAPIActivity
+            expr: |
+              rate(sierra_sync_api_suspicious_requests_total[5m]) > 1
+            for: 5m
+            labels:
+              severity: critical
+              service: security
+              team: security
+              pagerduty: true
+            annotations:
+              summary: "Suspicious API activity detected"
+              description: "{{ $value | humanize }} suspicious requests per second detected"
+              
+          - alert: UnauthorizedAccessAttempt
+            expr: |
+              increase(sierra_sync_unauthorized_access_total[5m]) > 0
+            labels:
+              severity: critical
+              service: security
+              team: security
+            annotations:
+              summary: "Unauthorized access attempt detected"
+              description: "{{ $value }} unauthorized access attempts in the last 5 minutes"

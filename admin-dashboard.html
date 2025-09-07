@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sierra Sync - Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Admin Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold">🛡️ Sierra Sync - Admin Dashboard</h1>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm">
+                        <span class="opacity-75">Admin User:</span>
+                        <span class="font-medium">System Administrator</span>
+                    </div>
+                    <a href="/" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                        Main Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Admin Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Organizations -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="building-2" class="w-5 h-5 text-blue-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Organizations</h3>
+                        <p class="text-2xl font-bold text-gray-900">127</p>
+                        <p class="text-sm text-green-600">+8 this month</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Users -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="users" class="w-5 h-5 text-green-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Users</h3>
+                        <p class="text-2xl font-bold text-gray-900">3,847</p>
+                        <p class="text-sm text-green-600">+156 this month</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Health -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-green-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="shield-check" class="w-5 h-5 text-green-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">System Health</h3>
+                        <p class="text-2xl font-bold text-green-700">Healthy</p>
+                        <p class="text-sm text-green-600">All services operational</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Revenue -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                            <i data-lucide="credit-card" class="w-5 h-5 text-purple-600"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Monthly Revenue</h3>
+                        <p class="text-2xl font-bold text-gray-900">$234K</p>
+                        <p class="text-sm text-green-600">+18.5% growth</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Tabs -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow mb-8">
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="-mb-px flex space-x-8" id="adminTabs">
+                    <button class="admin-tab-btn active py-2 px-1 border-b-2 border-red-500 font-medium text-sm text-red-600" data-tab="users">
+                        User Management
+                    </button>
+                    <button class="admin-tab-btn py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="orgs">
+                        Organizations
+                    </button>
+                    <button class="admin-tab-btn py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="system">
+                        System Monitor
+                    </button>
+                    <button class="admin-tab-btn py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="billing">
+                        Billing
+                    </button>
+                </nav>
+            </div>
+
+            <div id="adminTabContent">
+                <!-- Users Tab -->
+                <div id="users-tab" class="admin-tab-content">
+                    <h3 class="text-lg font-semibold mb-4">User Management</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                                                <i data-lucide="user" class="w-4 h-4"></i>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">John Smith</div>
+                                                <div class="text-sm text-gray-500">john@example.com</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Acme Corp</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Admin</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2 hours ago</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-red-600 hover:text-red-900 mr-3">Edit</button>
+                                        <button class="text-gray-600 hover:text-gray-900">Suspend</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Organizations Tab -->
+                <div id="orgs-tab" class="admin-tab-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">Organization Management</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900">Acme Corp</h4>
+                            <p class="text-sm text-gray-600">Enterprise Plan</p>
+                            <div class="mt-2 flex justify-between">
+                                <span class="text-sm text-gray-500">45 users</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Monitor Tab -->
+                <div id="system-tab" class="admin-tab-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">System Monitor</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900">Server Resources</h4>
+                            <div class="mt-4 space-y-2">
+                                <div class="flex justify-between">
+                                    <span class="text-sm">CPU Usage</span>
+                                    <span class="text-sm font-medium">45%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full" style="width: 45%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900">Database Status</h4>
+                            <div class="mt-4">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Operational</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Billing Tab -->
+                <div id="billing-tab" class="admin-tab-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">Billing Overview</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900">Monthly Recurring Revenue</h4>
+                            <p class="text-2xl font-bold text-green-600 mt-2">$234,567</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900">Churn Rate</h4>
+                            <p class="text-2xl font-bold text-red-600 mt-2">2.3%</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900">New Subscriptions</h4>
+                            <p class="text-2xl font-bold text-blue-600 mt-2">28</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Alerts -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+            <h3 class="text-lg font-semibold mb-4">System Alerts</h3>
+            <div class="space-y-4">
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-yellow-600 mt-0.5"></i>
+                        <div class="ml-3">
+                            <h4 class="text-sm font-medium text-yellow-800">High API Usage Detected</h4>
+                            <p class="text-sm text-yellow-700 mt-1">Organization "TechCorp" is approaching their API rate limit.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i data-lucide="check-circle-2" class="w-5 h-5 text-green-600 mt-0.5"></i>
+                        <div class="ml-3">
+                            <h4 class="text-sm font-medium text-green-800">System Backup Completed</h4>
+                            <p class="text-sm text-green-700 mt-1">Daily backup completed successfully at 03:00 UTC.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Admin tab functionality
+        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('.admin-tab-btn').forEach(b => {
+                    b.classList.remove('active', 'border-red-500', 'text-red-600');
+                    b.classList.add('border-transparent', 'text-gray-500');
+                });
+
+                // Add active class to clicked button
+                this.classList.add('active', 'border-red-500', 'text-red-600');
+                this.classList.remove('border-transparent', 'text-gray-500');
+
+                // Hide all tab contents
+                document.querySelectorAll('.admin-tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+
+                // Show selected tab content
+                const tabId = this.getAttribute('data-tab') + '-tab';
+                document.getElementById(tabId).classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,850 @@
+# ELK Stack (Elasticsearch, Logstash, Kibana) for Sierra Sync
+# Centralized log aggregation and analysis
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels:
+    name: logging
+    monitoring: enabled
+
+---
+# Elasticsearch Master Nodes
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch-master
+  namespace: logging
+spec:
+  serviceName: elasticsearch-master
+  replicas: 3
+  selector:
+    matchLabels:
+      app: elasticsearch
+      role: master
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        role: master
+    spec:
+      initContainers:
+        - name: configure-sysctl
+          image: busybox:1.35
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+        - name: configure-permissions
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /usr/share/elasticsearch/data
+              chown -R 1000:1000 /usr/share/elasticsearch/data
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+          env:
+            - name: cluster.name
+              value: sierra-sync-logs
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: node.roles
+              value: "master"
+            - name: discovery.seed_hosts
+              value: elasticsearch-master-0.elasticsearch-master,elasticsearch-master-1.elasticsearch-master,elasticsearch-master-2.elasticsearch-master
+            - name: cluster.initial_master_nodes
+              value: elasticsearch-master-0,elasticsearch-master-1,elasticsearch-master-2
+            - name: ES_JAVA_OPTS
+              value: "-Xms2g -Xmx2g"
+            - name: xpack.security.enabled
+              value: "true"
+            - name: xpack.security.transport.ssl.enabled
+              value: "true"
+            - name: xpack.security.transport.ssl.verification_mode
+              value: certificate
+            - name: xpack.security.transport.ssl.keystore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: xpack.security.transport.ssl.truststore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: xpack.security.http.ssl.enabled
+              value: "true"
+            - name: xpack.security.http.ssl.keystore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: xpack.security.http.ssl.truststore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-credentials
+                  key: password
+            - name: xpack.monitoring.collection.enabled
+              value: "true"
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+            - name: certs
+              mountPath: /usr/share/elasticsearch/config/certs
+              readOnly: true
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  curl -s -k --fail https://localhost:9200/_cluster/health?local=true \
+                    -u elastic:${ELASTIC_PASSWORD} | grep -q '"status":"yellow\|green"'
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  curl -s -k --fail https://localhost:9200/_cluster/health?local=true \
+                    -u elastic:${ELASTIC_PASSWORD}
+            initialDelaySeconds: 90
+            periodSeconds: 10
+      volumes:
+        - name: certs
+          secret:
+            secretName: elasticsearch-certificates
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests:
+            storage: 50Gi
+
+---
+# Elasticsearch Data Nodes
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch-data
+  namespace: logging
+spec:
+  serviceName: elasticsearch-data
+  replicas: 2
+  selector:
+    matchLabels:
+      app: elasticsearch
+      role: data
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        role: data
+    spec:
+      initContainers:
+        - name: configure-sysctl
+          image: busybox:1.35
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+        - name: configure-permissions
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /usr/share/elasticsearch/data
+              chown -R 1000:1000 /usr/share/elasticsearch/data
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+          env:
+            - name: cluster.name
+              value: sierra-sync-logs
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: node.roles
+              value: "data,ingest"
+            - name: discovery.seed_hosts
+              value: elasticsearch-master
+            - name: ES_JAVA_OPTS
+              value: "-Xms4g -Xmx4g"
+            - name: xpack.security.enabled
+              value: "true"
+            - name: xpack.security.transport.ssl.enabled
+              value: "true"
+            - name: xpack.security.transport.ssl.verification_mode
+              value: certificate
+            - name: xpack.security.transport.ssl.keystore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: xpack.security.transport.ssl.truststore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: xpack.security.http.ssl.enabled
+              value: "true"
+            - name: xpack.security.http.ssl.keystore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: xpack.security.http.ssl.truststore.path
+              value: /usr/share/elasticsearch/config/certs/elastic-certificates.p12
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-credentials
+                  key: password
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+            - name: certs
+              mountPath: /usr/share/elasticsearch/config/certs
+              readOnly: true
+          resources:
+            requests:
+              memory: "8Gi"
+              cpu: "2"
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  curl -s -k --fail https://localhost:9200/_cluster/health?local=true \
+                    -u elastic:${ELASTIC_PASSWORD} | grep -q '"status":"yellow\|green"'
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: certs
+          secret:
+            secretName: elasticsearch-certificates
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests:
+            storage: 500Gi
+
+---
+# Elasticsearch Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-master
+  namespace: logging
+spec:
+  clusterIP: None
+  selector:
+    app: elasticsearch
+    role: master
+  ports:
+    - name: transport
+      port: 9300
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-data
+  namespace: logging
+spec:
+  clusterIP: None
+  selector:
+    app: elasticsearch
+    role: data
+  ports:
+    - name: transport
+      port: 9300
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: logging
+spec:
+  type: ClusterIP
+  selector:
+    app: elasticsearch
+  ports:
+    - name: http
+      port: 9200
+      targetPort: 9200
+
+---
+# Logstash Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: logging
+data:
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    xpack.monitoring.enabled: true
+    xpack.monitoring.elasticsearch.hosts: ["https://elasticsearch:9200"]
+    xpack.monitoring.elasticsearch.username: elastic
+    xpack.monitoring.elasticsearch.password: "${ELASTIC_PASSWORD}"
+    xpack.monitoring.elasticsearch.ssl.certificate_authority: /usr/share/logstash/certs/ca.crt
+    
+  pipeline.conf: |
+    input {
+      beats {
+        port => 5044
+        ssl => true
+        ssl_certificate => "/usr/share/logstash/certs/logstash.crt"
+        ssl_key => "/usr/share/logstash/certs/logstash.key"
+      }
+      
+      tcp {
+        port => 5000
+        codec => json
+      }
+      
+      http {
+        port => 8080
+        codec => json
+      }
+      
+      kafka {
+        bootstrap_servers => "kafka:9092"
+        topics => ["sierra-sync-logs"]
+        group_id => "logstash-consumer"
+        codec => json
+      }
+    }
+    
+    filter {
+      # Parse JSON logs
+      if [message] =~ /^\{.*\}$/ {
+        json {
+          source => "message"
+        }
+      }
+      
+      # Parse Sierra Sync application logs
+      if [kubernetes][labels][app] == "sierra-sync-api" {
+        grok {
+          match => {
+            "message" => "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:log_message}"
+          }
+        }
+        
+        mutate {
+          add_field => {
+            "service" => "sierra-sync-api"
+            "environment" => "%{[kubernetes][namespace]}"
+          }
+        }
+      }
+      
+      # Parse SQL queries
+      if [message] =~ /SELECT|INSERT|UPDATE|DELETE/ {
+        grok {
+          match => {
+            "message" => "%{WORD:sql_operation} .* FROM %{WORD:table_name}"
+          }
+          tag_on_failure => []
+        }
+      }
+      
+      # Add GeoIP information
+      if [client_ip] {
+        geoip {
+          source => "client_ip"
+          target => "geoip"
+        }
+      }
+      
+      # Parse user agent
+      if [user_agent] {
+        useragent {
+          source => "user_agent"
+          target => "ua"
+        }
+      }
+      
+      # Calculate response time
+      if [response_time_ms] {
+        ruby {
+          code => "
+            rt = event.get('response_time_ms').to_f
+            if rt > 1000
+              event.set('performance_category', 'slow')
+            elsif rt > 500
+              event.set('performance_category', 'moderate')
+            else
+              event.set('performance_category', 'fast')
+            end
+          "
+        }
+      }
+      
+      # Enrich with metadata
+      mutate {
+        add_field => {
+          "[@metadata][index_name]" => "sierra-sync-%{+YYYY.MM.dd}"
+        }
+      }
+      
+      # Remove unnecessary fields
+      mutate {
+        remove_field => ["host", "agent", "ecs", "input", "log"]
+      }
+    }
+    
+    output {
+      elasticsearch {
+        hosts => ["https://elasticsearch:9200"]
+        index => "%{[@metadata][index_name]}"
+        user => "elastic"
+        password => "${ELASTIC_PASSWORD}"
+        ssl => true
+        cacert => "/usr/share/logstash/certs/ca.crt"
+        template_name => "sierra-sync"
+        template => "/usr/share/logstash/templates/sierra-sync.json"
+        template_overwrite => true
+      }
+      
+      # Send critical errors to dedicated index
+      if [level] == "ERROR" or [level] == "FATAL" {
+        elasticsearch {
+          hosts => ["https://elasticsearch:9200"]
+          index => "sierra-sync-errors-%{+YYYY.MM.dd}"
+          user => "elastic"
+          password => "${ELASTIC_PASSWORD}"
+          ssl => true
+          cacert => "/usr/share/logstash/certs/ca.crt"
+        }
+      }
+      
+      # Output metrics to monitoring
+      if [metric] {
+        statsd {
+          host => "statsd"
+          port => 8125
+          namespace => "logstash"
+          sender => "sierra-sync"
+          increment => ["logstash.events.processed"]
+        }
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: logging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      containers:
+        - name: logstash
+          image: docker.elastic.co/logstash/logstash:8.11.1
+          ports:
+            - containerPort: 5044
+              name: beats
+            - containerPort: 5000
+              name: tcp
+            - containerPort: 8080
+              name: http
+            - containerPort: 9600
+              name: metrics
+          env:
+            - name: ELASTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-credentials
+                  key: password
+            - name: LS_JAVA_OPTS
+              value: "-Xms2g -Xmx2g"
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/logstash/config/logstash.yml
+              subPath: logstash.yml
+            - name: config
+              mountPath: /usr/share/logstash/pipeline/pipeline.conf
+              subPath: pipeline.conf
+            - name: certs
+              mountPath: /usr/share/logstash/certs
+              readOnly: true
+            - name: templates
+              mountPath: /usr/share/logstash/templates
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9600
+            initialDelaySeconds: 60
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: logstash-config
+        - name: certs
+          secret:
+            secretName: logstash-certificates
+        - name: templates
+          configMap:
+            name: logstash-templates
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: logging
+spec:
+  type: ClusterIP
+  selector:
+    app: logstash
+  ports:
+    - name: beats
+      port: 5044
+      targetPort: 5044
+    - name: tcp
+      port: 5000
+      targetPort: 5000
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: metrics
+      port: 9600
+      targetPort: 9600
+
+---
+# Kibana Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  namespace: logging
+data:
+  kibana.yml: |
+    server.host: "0.0.0.0"
+    server.port: 5601
+    server.publicBaseUrl: "https://kibana.sierrasync.com"
+    
+    elasticsearch.hosts: ["https://elasticsearch:9200"]
+    elasticsearch.username: "kibana_system"
+    elasticsearch.password: "${KIBANA_PASSWORD}"
+    elasticsearch.ssl.certificateAuthorities: ["/usr/share/kibana/certs/ca.crt"]
+    
+    server.ssl.enabled: true
+    server.ssl.certificate: /usr/share/kibana/certs/kibana.crt
+    server.ssl.key: /usr/share/kibana/certs/kibana.key
+    
+    xpack.security.enabled: true
+    xpack.security.encryptionKey: "${KIBANA_ENCRYPTION_KEY}"
+    xpack.encryptedSavedObjects.encryptionKey: "${KIBANA_SAVED_OBJECTS_KEY}"
+    xpack.reporting.encryptionKey: "${KIBANA_REPORTING_KEY}"
+    
+    xpack.monitoring.enabled: true
+    xpack.monitoring.ui.enabled: true
+    
+    # Alerting configuration
+    xpack.alerting.enabled: true
+    xpack.actions.enabled: true
+    
+    # Machine Learning
+    xpack.ml.enabled: true
+    
+    # APM
+    xpack.apm.enabled: true
+    xpack.apm.ui.enabled: true
+    
+    # Observability
+    xpack.observability.enabled: true
+    
+    # Fleet
+    xpack.fleet.enabled: true
+    xpack.fleet.agents.elasticsearch.hosts: ["https://elasticsearch:9200"]
+    
+    # Maps
+    xpack.maps.enabled: true
+    
+    # Custom branding
+    server.customResponseHeaders:
+      X-Frame-Options: "SAMEORIGIN"
+      X-Content-Type-Options: "nosniff"
+      X-XSS-Protection: "1; mode=block"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: logging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+        - name: kibana
+          image: docker.elastic.co/kibana/kibana:8.11.1
+          ports:
+            - containerPort: 5601
+              name: http
+          env:
+            - name: KIBANA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-credentials
+                  key: kibana-password
+            - name: KIBANA_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kibana-secrets
+                  key: encryption-key
+            - name: KIBANA_SAVED_OBJECTS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kibana-secrets
+                  key: saved-objects-key
+            - name: KIBANA_REPORTING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kibana-secrets
+                  key: reporting-key
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/kibana/config/kibana.yml
+              subPath: kibana.yml
+            - name: certs
+              mountPath: /usr/share/kibana/certs
+              readOnly: true
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 5601
+              scheme: HTTPS
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: 5601
+              scheme: HTTPS
+            initialDelaySeconds: 90
+            periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: kibana-config
+        - name: certs
+          secret:
+            secretName: kibana-certificates
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: logging
+spec:
+  type: ClusterIP
+  selector:
+    app: kibana
+  ports:
+    - name: http
+      port: 5601
+      targetPort: 5601
+
+---
+# Filebeat DaemonSet for log collection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: logging
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+      - type: container
+        paths:
+          - /var/log/containers/*.log
+        processors:
+          - add_kubernetes_metadata:
+              host: ${NODE_NAME}
+              matchers:
+                - logs_path:
+                    logs_path: "/var/log/containers/"
+          - drop_event:
+              when:
+                or:
+                  - contains:
+                      kubernetes.namespace: "kube-system"
+                  - contains:
+                      kubernetes.namespace: "logging"
+    
+    output.logstash:
+      hosts: ["logstash:5044"]
+      ssl.enabled: true
+      ssl.certificate_authorities: ["/usr/share/filebeat/certs/ca.crt"]
+      ssl.certificate: "/usr/share/filebeat/certs/filebeat.crt"
+      ssl.key: "/usr/share/filebeat/certs/filebeat.key"
+    
+    processors:
+      - add_host_metadata:
+          when.not.contains:
+            tags: forwarded
+      - add_docker_metadata: ~
+      - add_kubernetes_metadata: ~
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: filebeat
+  namespace: logging
+spec:
+  selector:
+    matchLabels:
+      app: filebeat
+  template:
+    metadata:
+      labels:
+        app: filebeat
+    spec:
+      serviceAccountName: filebeat
+      containers:
+        - name: filebeat
+          image: docker.elastic.co/beats/filebeat:8.11.1
+          args: ["-c", "/etc/filebeat.yml", "-e"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: config
+              mountPath: /etc/filebeat.yml
+              subPath: filebeat.yml
+            - name: certs
+              mountPath: /usr/share/filebeat/certs
+              readOnly: true
+            - name: data
+              mountPath: /usr/share/filebeat/data
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+          resources:
+            requests:
+              memory: "200Mi"
+              cpu: "100m"
+            limits:
+              memory: "400Mi"
+              cpu: "200m"
+      volumes:
+        - name: config
+          configMap:
+            name: filebeat-config
+        - name: certs
+          secret:
+            secretName: filebeat-certificates
+        - name: data
+          hostPath:
+            path: /var/lib/filebeat-data
+            type: DirectoryOrCreate
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: varlog
+          hostPath:
+            path: /var/log
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: filebeat
+  namespace: logging
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: filebeat
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - pods
+      - nodes
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: filebeat
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: filebeat
+subjects:
+  - kind: ServiceAccount
+    name: filebeat
+    namespace: logging

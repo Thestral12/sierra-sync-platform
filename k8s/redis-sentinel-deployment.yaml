@@ -1,0 +1,551 @@
+# Redis Sentinel Deployment for High Availability
+# Provides automatic failover and monitoring for Redis cache
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-scripts
+  namespace: sierra-sync
+data:
+  redis-notify.sh: |
+    #!/bin/bash
+    # Redis Sentinel notification script
+    EVENT_TYPE=$1
+    EVENT_DESCRIPTION=$2
+    
+    # Log the event
+    echo "$(date): $EVENT_TYPE - $EVENT_DESCRIPTION" >> /var/log/redis/sentinel-events.log
+    
+    # Send Slack notification
+    if [ -n "$SLACK_WEBHOOK_URL" ]; then
+      curl -X POST -H 'Content-type: application/json' \
+        --data "{\"text\":\"Redis Sentinel Alert: $EVENT_TYPE - $EVENT_DESCRIPTION\"}" \
+        "$SLACK_WEBHOOK_URL"
+    fi
+    
+  redis-reconfig.sh: |
+    #!/bin/bash
+    # Redis client reconfiguration script
+    MASTER_NAME=$1
+    ROLE=$2
+    STATE=$3
+    FROM_IP=$4
+    FROM_PORT=$5
+    TO_IP=$6
+    TO_PORT=$7
+    
+    echo "$(date): Reconfiguring from $FROM_IP:$FROM_PORT to $TO_IP:$TO_PORT" >> /var/log/redis/reconfig.log
+    
+    # Update application configuration
+    # This would typically update a config map or notify services
+    kubectl patch configmap redis-connection \
+      -n sierra-sync \
+      --type merge \
+      -p "{\"data\":{\"master_host\":\"$TO_IP\",\"master_port\":\"$TO_PORT\"}}"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-master
+  namespace: sierra-sync
+  labels:
+    app: redis
+    role: master
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  selector:
+    app: redis
+    role: master
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-replica
+  namespace: sierra-sync
+  labels:
+    app: redis
+    role: replica
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  selector:
+    app: redis
+    role: replica
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  namespace: sierra-sync
+  labels:
+    app: redis-sentinel
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service
+  ports:
+    - port: 26379
+      targetPort: 26379
+      name: sentinel
+  selector:
+    app: redis-sentinel
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-master
+  namespace: sierra-sync
+spec:
+  serviceName: redis-master
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      role: master
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: master
+        tier: cache
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: [redis]
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-server
+            - /etc/redis/redis.conf
+          ports:
+            - containerPort: 6379
+              name: redis
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: password
+            - name: REDIS_CONFIG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: config-password
+            - name: REDIS_SHUTDOWN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: shutdown-password
+          volumeMounts:
+            - name: redis-config
+              mountPath: /etc/redis
+            - name: redis-data
+              mountPath: /data/redis
+            - name: redis-logs
+              mountPath: /var/log/redis
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+      volumes:
+        - name: redis-config
+          configMap:
+            name: redis-config
+            items:
+              - key: redis-master.conf
+                path: redis.conf
+        - name: redis-logs
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests:
+            storage: 50Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-replica
+  namespace: sierra-sync
+spec:
+  serviceName: redis-replica
+  replicas: 2
+  selector:
+    matchLabels:
+      app: redis
+      role: replica
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: replica
+        tier: cache
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: [redis]
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-server
+            - /etc/redis/redis.conf
+          ports:
+            - containerPort: 6379
+              name: redis
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: password
+            - name: REDIS_CONFIG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: config-password
+            - name: REDIS_SHUTDOWN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: shutdown-password
+          volumeMounts:
+            - name: redis-config
+              mountPath: /etc/redis
+            - name: redis-data
+              mountPath: /data/redis
+            - name: redis-logs
+              mountPath: /var/log/redis
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "250m"
+            limits:
+              memory: "4Gi"
+              cpu: "1"
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+      volumes:
+        - name: redis-config
+          configMap:
+            name: redis-config
+            items:
+              - key: redis-replica.conf
+                path: redis.conf
+        - name: redis-logs
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests:
+            storage: 50Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  namespace: sierra-sync
+spec:
+  serviceName: redis-sentinel
+  replicas: 3
+  selector:
+    matchLabels:
+      app: redis-sentinel
+  template:
+    metadata:
+      labels:
+        app: redis-sentinel
+        tier: cache
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: [redis-sentinel]
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: config-init
+          image: redis:7.2-alpine
+          command:
+            - sh
+            - -c
+            - |
+              # Get pod index from hostname
+              INDEX="${HOSTNAME##*-}"
+              
+              # Copy base config
+              cp /etc/redis-sentinel/sentinel.conf /etc/sentinel/sentinel.conf
+              
+              # Set unique announce IP
+              sed -i "s/\${SENTINEL_ANNOUNCE_IP}/redis-sentinel-${INDEX}.redis-sentinel.sierra-sync.svc.cluster.local/g" /etc/sentinel/sentinel.conf
+              sed -i "s/\${SENTINEL_ANNOUNCE_PORT}/26379/g" /etc/sentinel/sentinel.conf
+              
+              # Substitute passwords
+              sed -i "s/\${REDIS_PASSWORD}/${REDIS_PASSWORD}/g" /etc/sentinel/sentinel.conf
+              sed -i "s/\${SENTINEL_PASSWORD}/${SENTINEL_PASSWORD}/g" /etc/sentinel/sentinel.conf
+              
+              # Update master reference
+              sed -i "s/redis-master/redis-master-0.redis-master.sierra-sync.svc.cluster.local/g" /etc/sentinel/sentinel.conf
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: password
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: sentinel-password
+          volumeMounts:
+            - name: sentinel-config-template
+              mountPath: /etc/redis-sentinel
+            - name: sentinel-config
+              mountPath: /etc/sentinel
+      containers:
+        - name: sentinel
+          image: redis:7.2-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - redis-sentinel
+            - /etc/sentinel/sentinel.conf
+          ports:
+            - containerPort: 26379
+              name: sentinel
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: password
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: sentinel-password
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secrets
+                  key: slack-webhook
+                  optional: true
+          volumeMounts:
+            - name: sentinel-config
+              mountPath: /etc/sentinel
+            - name: sentinel-data
+              mountPath: /data/sentinel
+            - name: sentinel-logs
+              mountPath: /var/log/redis
+            - name: redis-scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "200m"
+          livenessProbe:
+            tcpSocket:
+              port: sentinel
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -p
+                - "26379"
+                - -a
+                - $(SENTINEL_PASSWORD)
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+      volumes:
+        - name: sentinel-config-template
+          configMap:
+            name: redis-config
+            items:
+              - key: sentinel.conf
+                path: sentinel.conf
+        - name: sentinel-config
+          emptyDir: {}
+        - name: sentinel-logs
+          emptyDir: {}
+        - name: redis-scripts
+          configMap:
+            name: redis-scripts
+            defaultMode: 0755
+  volumeClaimTemplates:
+    - metadata:
+        name: sentinel-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3-encrypted
+        resources:
+          requests:
+            storage: 10Gi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-connection
+  namespace: sierra-sync
+data:
+  master_host: "redis-master-0.redis-master.sierra-sync.svc.cluster.local"
+  master_port: "6379"
+  sentinel_hosts: "redis-sentinel-0.redis-sentinel.sierra-sync.svc.cluster.local:26379,redis-sentinel-1.redis-sentinel.sierra-sync.svc.cluster.local:26379,redis-sentinel-2.redis-sentinel.sierra-sync.svc.cluster.local:26379"
+  
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-master-pdb
+  namespace: sierra-sync
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: redis
+      role: master
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-replica-pdb
+  namespace: sierra-sync
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: redis
+      role: replica
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-sentinel-pdb
+  namespace: sierra-sync
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: redis-sentinel
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-metrics
+  namespace: sierra-sync
+  labels:
+    app: redis
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  endpoints:
+    - port: redis
+      interval: 30s
+      path: /metrics
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-sentinel-metrics
+  namespace: sierra-sync
+  labels:
+    app: redis-sentinel
+spec:
+  selector:
+    matchLabels:
+      app: redis-sentinel
+  endpoints:
+    - port: sentinel
+      interval: 30s
+      path: /metrics

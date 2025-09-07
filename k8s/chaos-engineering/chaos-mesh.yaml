@@ -1,0 +1,547 @@
+# Chaos Mesh Configuration for Sierra Sync
+# Resilience testing and chaos engineering experiments
+
+---
+# Chaos Mesh Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chaos-testing
+
+---
+# Install Chaos Mesh via Helm values
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-mesh-values
+  namespace: chaos-testing
+data:
+  values.yaml: |
+    controllerManager:
+      replicaCount: 3
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 512Mi
+    
+    chaosDaemon:
+      runtime: containerd
+      socketPath: /run/containerd/containerd.sock
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 512Mi
+    
+    dashboard:
+      create: true
+      replicaCount: 2
+      securityMode: true
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 512Mi
+    
+    prometheus:
+      create: true
+    
+    webhook:
+      certManager:
+        enabled: true
+
+---
+# Network Chaos - Latency Injection
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: api-latency-injection
+  namespace: sierra-sync
+spec:
+  action: delay
+  mode: random-max-percent
+  value: "50"
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  delay:
+    latency: "100ms"
+    correlation: "25"
+    jitter: "50ms"
+  duration: "5m"
+  scheduler:
+    cron: "0 */6 * * *"  # Every 6 hours
+
+---
+# Network Chaos - Packet Loss
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: database-packet-loss
+  namespace: sierra-sync
+spec:
+  action: loss
+  mode: random-max-percent
+  value: "30"
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: postgresql
+  loss:
+    loss: "10"
+    correlation: "25"
+  duration: "3m"
+  scheduler:
+    cron: "30 */4 * * *"  # Every 4 hours at 30 minutes
+
+---
+# Pod Chaos - Pod Failure
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: api-pod-failure
+  namespace: sierra-sync
+spec:
+  action: pod-failure
+  mode: random-max-percent
+  value: "30"
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  duration: "2m"
+  scheduler:
+    cron: "15 */3 * * *"  # Every 3 hours at 15 minutes
+
+---
+# Pod Chaos - Container Kill
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: worker-container-kill
+  namespace: sierra-sync
+spec:
+  action: container-kill
+  mode: one
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-worker
+  containerNames:
+    - worker
+  gracePeriod: 0
+  scheduler:
+    cron: "45 */2 * * *"  # Every 2 hours at 45 minutes
+
+---
+# Stress Chaos - CPU Stress
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: api-cpu-stress
+  namespace: sierra-sync
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: "1m"
+  scheduler:
+    cron: "0 */8 * * *"  # Every 8 hours
+
+---
+# Stress Chaos - Memory Stress
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: cache-memory-stress
+  namespace: sierra-sync
+spec:
+  mode: random-max-percent
+  value: "50"
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: redis
+  stressors:
+    memory:
+      workers: 2
+      size: "256MB"
+  duration: "90s"
+  scheduler:
+    cron: "30 */6 * * *"  # Every 6 hours at 30 minutes
+
+---
+# IO Chaos - Disk I/O Delay
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: database-io-delay
+  namespace: sierra-sync
+spec:
+  action: latency
+  mode: all
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: postgresql
+  volumePath: /var/lib/postgresql/data
+  path: "/*"
+  delay: "100ms"
+  percent: 50
+  duration: "2m"
+  scheduler:
+    cron: "15 */5 * * *"  # Every 5 hours at 15 minutes
+
+---
+# IO Chaos - Disk Fill
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: logs-disk-fill
+  namespace: sierra-sync
+spec:
+  action: fault
+  mode: one
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  volumePath: /var/log
+  path: "/chaos-test.log"
+  errno: 28  # ENOSPC - No space left on device
+  percent: 100
+  duration: "30s"
+  scheduler:
+    cron: "0 */12 * * *"  # Every 12 hours
+
+---
+# Time Chaos - Clock Skew
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: api-clock-skew
+  namespace: sierra-sync
+spec:
+  mode: random-max-percent
+  value: "30"
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  timeOffset: "30s"
+  duration: "5m"
+  scheduler:
+    cron: "45 */8 * * *"  # Every 8 hours at 45 minutes
+
+---
+# HTTP Chaos - API Failures
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: api-http-failures
+  namespace: sierra-sync
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  target: Request
+  port: 3001
+  method: POST
+  path: "/api/*"
+  abort: true
+  duration: "1m"
+  scheduler:
+    cron: "30 */4 * * *"  # Every 4 hours at 30 minutes
+
+---
+# HTTP Chaos - Response Delay
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: api-response-delay
+  namespace: sierra-sync
+spec:
+  mode: random-max-percent
+  value: "50"
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  target: Response
+  port: 3001
+  delay: "3s"
+  duration: "2m"
+  scheduler:
+    cron: "15 */3 * * *"  # Every 3 hours at 15 minutes
+
+---
+# DNS Chaos - DNS Failure
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: external-dns-failure
+  namespace: sierra-sync
+spec:
+  action: error
+  mode: all
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-api
+  patterns:
+    - "api.external-service.com"
+    - "auth.provider.com"
+  duration: "1m"
+  scheduler:
+    cron: "0 */6 * * *"  # Every 6 hours
+
+---
+# Kernel Chaos - System Call Failures
+apiVersion: chaos-mesh.org/v1alpha1
+kind: KernelChaos
+metadata:
+  name: syscall-failures
+  namespace: sierra-sync
+spec:
+  mode: random-max-percent
+  value: "30"
+  selector:
+    namespaces:
+      - sierra-sync
+    labelSelectors:
+      app: sierra-sync-worker
+  failKernRequest:
+    callchain:
+      - funcname: "sys_read"
+    failtype: 1
+    probability: 10
+    times: 5
+  duration: "30s"
+  scheduler:
+    cron: "30 */12 * * *"  # Every 12 hours at 30 minutes
+
+---
+# Workflow - Combined Chaos Scenario
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: peak-load-simulation
+  namespace: sierra-sync
+spec:
+  entry: peak-load
+  templates:
+    - name: peak-load
+      templateType: Serial
+      deadline: 30m
+      children:
+        - cpu-stress
+        - network-delay
+        - pod-failures
+        - recovery-check
+    
+    - name: cpu-stress
+      templateType: StressChaos
+      deadline: 5m
+      stressChaos:
+        mode: all
+        selector:
+          namespaces:
+            - sierra-sync
+          labelSelectors:
+            app: sierra-sync-api
+        stressors:
+          cpu:
+            workers: 4
+            load: 90
+    
+    - name: network-delay
+      templateType: NetworkChaos
+      deadline: 5m
+      networkChaos:
+        action: delay
+        mode: all
+        selector:
+          namespaces:
+            - sierra-sync
+          labelSelectors:
+            app: sierra-sync-api
+        delay:
+          latency: "200ms"
+          jitter: "100ms"
+    
+    - name: pod-failures
+      templateType: PodChaos
+      deadline: 5m
+      podChaos:
+        action: pod-failure
+        mode: random-max-percent
+        value: "40"
+        selector:
+          namespaces:
+            - sierra-sync
+          labelSelectors:
+            tier: backend
+    
+    - name: recovery-check
+      templateType: Task
+      deadline: 10m
+      task:
+        container:
+          name: recovery-validator
+          image: sierra-sync/chaos-validator:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking system recovery..."
+              kubectl wait --for=condition=ready pod -l app=sierra-sync-api -n sierra-sync --timeout=300s
+              curl -f http://sierra-sync-api:3001/health || exit 1
+              echo "System recovered successfully"
+
+---
+# Workflow - Disaster Recovery Test
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: disaster-recovery-test
+  namespace: sierra-sync
+spec:
+  entry: disaster-simulation
+  templates:
+    - name: disaster-simulation
+      templateType: Parallel
+      deadline: 20m
+      children:
+        - database-failure
+        - cache-failure
+        - api-overload
+    
+    - name: database-failure
+      templateType: PodChaos
+      deadline: 10m
+      podChaos:
+        action: pod-kill
+        mode: all
+        selector:
+          namespaces:
+            - sierra-sync
+          labelSelectors:
+            app: postgresql
+        gracePeriod: 0
+    
+    - name: cache-failure
+      templateType: PodChaos
+      deadline: 10m
+      podChaos:
+        action: pod-kill
+        mode: all
+        selector:
+          namespaces:
+            - sierra-sync
+          labelSelectors:
+            app: redis
+        gracePeriod: 0
+    
+    - name: api-overload
+      templateType: StressChaos
+      deadline: 10m
+      stressChaos:
+        mode: all
+        selector:
+          namespaces:
+            - sierra-sync
+          labelSelectors:
+            app: sierra-sync-api
+        stressors:
+          cpu:
+            workers: 8
+            load: 95
+          memory:
+            workers: 4
+            size: "512MB"
+
+---
+# Schedule - Regular Chaos Testing
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: daily-chaos-testing
+  namespace: sierra-sync
+spec:
+  schedule: "@daily"
+  startingDeadlineSeconds: 3600
+  concurrencyPolicy: Forbid
+  type: Workflow
+  workflow:
+    entry: daily-tests
+    templates:
+      - name: daily-tests
+        templateType: Serial
+        deadline: 1h
+        children:
+          - morning-latency
+          - afternoon-failures
+          - evening-stress
+      
+      - name: morning-latency
+        templateType: NetworkChaos
+        deadline: 10m
+        networkChaos:
+          action: delay
+          mode: all
+          selector:
+            namespaces:
+              - sierra-sync
+          delay:
+            latency: "50ms"
+      
+      - name: afternoon-failures
+        templateType: PodChaos
+        deadline: 10m
+        podChaos:
+          action: pod-failure
+          mode: one
+          selector:
+            namespaces:
+              - sierra-sync
+      
+      - name: evening-stress
+        templateType: StressChaos
+        deadline: 10m
+        stressChaos:
+          mode: all
+          selector:
+            namespaces:
+              - sierra-sync
+          stressors:
+            cpu:
+              workers: 2
+              load: 60

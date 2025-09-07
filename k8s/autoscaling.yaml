@@ -1,0 +1,437 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sierra-sync-api-hpa
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-api
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sierra-sync-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 20
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 3
+          periodSeconds: 60
+      selectPolicy: Max
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sierra-sync-web-hpa
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sierra-sync-web
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Pods
+      pods:
+        metric:
+          name: nginx_connections_active
+        target:
+          type: AverageValue
+          averageValue: "50"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sierra-sync-worker-hpa
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-worker
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sierra-sync-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 85
+    - type: Object
+      object:
+        metric:
+          name: queue_length
+          selector:
+            matchLabels:
+              queue: "default"
+        target:
+          type: Value
+          value: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Percent
+          value: 20
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 3
+          periodSeconds: 30
+      selectPolicy: Max
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sierra-sync-api-pdb
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: sierra-sync-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sierra-sync-web-pdb
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: sierra-sync-web
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sierra-sync-worker-pdb
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: sierra-sync-worker
+
+---
+# Vertical Pod Autoscaler for database
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: sierra-sync-postgres-vpa
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+    component: autoscaling
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: sierra-sync-postgres-primary
+  updatePolicy:
+    updateMode: "Off"  # Recommend only, don't auto-update
+  resourcePolicy:
+    containerPolicies:
+      - containerName: postgres
+        minAllowed:
+          cpu: 500m
+          memory: 1Gi
+        maxAllowed:
+          cpu: 4000m
+          memory: 8Gi
+        controlledResources: ["cpu", "memory"]
+      - containerName: postgres-exporter
+        mode: "Off"
+
+---
+# Vertical Pod Autoscaler for Redis
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: sierra-sync-redis-vpa
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-redis
+    component: autoscaling
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: sierra-sync-redis-master
+  updatePolicy:
+    updateMode: "Off"  # Recommend only, don't auto-update
+  resourcePolicy:
+    containerPolicies:
+      - containerName: redis
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: 1000m
+          memory: 2Gi
+        controlledResources: ["cpu", "memory"]
+      - containerName: redis-exporter
+        mode: "Off"
+
+---
+# Custom Resource for KEDA (Kubernetes Event Driven Autoscaler)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: sierra-sync-queue-scaler
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-worker
+    component: keda-scaling
+spec:
+  scaleTargetRef:
+    name: sierra-sync-worker
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  cooldownPeriod: 30
+  idleReplicaCount: 1
+  triggers:
+    - type: redis
+      metadata:
+        address: sierra-sync-redis-master:6379
+        password: REDIS_PASSWORD
+        listName: sierra-sync:queues:default
+        listLength: "10"
+        activationListLength: "5"
+    - type: redis
+      metadata:
+        address: sierra-sync-redis-master:6379
+        password: REDIS_PASSWORD
+        listName: sierra-sync:queues:high-priority
+        listLength: "5"
+        activationListLength: "2"
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.sierra-sync-monitoring.svc.cluster.local:9090
+        metricName: api_response_time_p95
+        threshold: "500"
+        query: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+
+---
+# Cluster Autoscaler configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler-config
+  namespace: kube-system
+  labels:
+    app: cluster-autoscaler
+data:
+  nodes.max: "50"
+  nodes.min: "3"
+  scale-down-delay-after-add: "10m"
+  scale-down-unneeded-time: "10m"
+  scale-down-utilization-threshold: "0.5"
+  skip-nodes-with-local-storage: "false"
+  skip-nodes-with-system-pods: "false"
+
+---
+# Node pool configuration for different workload types
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sierra-sync-node-pools
+  namespace: sierra-sync
+  labels:
+    component: infrastructure
+data:
+  api-nodes.yaml: |
+    apiVersion: v1
+    kind: NodePool
+    metadata:
+      name: sierra-sync-api-nodes
+    spec:
+      nodeSelector:
+        workload-type: api
+        instance-type: c6i.large
+      taints:
+        - key: workload-type
+          value: api
+          effect: NoSchedule
+      minSize: 2
+      maxSize: 10
+      desiredSize: 3
+      
+  database-nodes.yaml: |
+    apiVersion: v1
+    kind: NodePool
+    metadata:
+      name: sierra-sync-database-nodes
+    spec:
+      nodeSelector:
+        workload-type: database
+        instance-type: r6i.xlarge
+        storage-type: gp3
+      taints:
+        - key: workload-type
+          value: database
+          effect: NoSchedule
+      minSize: 1
+      maxSize: 3
+      desiredSize: 2
+      
+  worker-nodes.yaml: |
+    apiVersion: v1
+    kind: NodePool
+    metadata:
+      name: sierra-sync-worker-nodes
+    spec:
+      nodeSelector:
+        workload-type: worker
+        instance-type: m6i.large
+      taints:
+        - key: workload-type
+          value: worker
+          effect: NoSchedule
+      minSize: 1
+      maxSize: 15
+      desiredSize: 2
+
+---
+# Priority Classes for workload scheduling
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sierra-sync-critical
+  labels:
+    component: scheduling
+value: 1000
+globalDefault: false
+description: "Critical Sierra Sync system components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sierra-sync-high
+  labels:
+    component: scheduling
+value: 800
+globalDefault: false
+description: "High priority Sierra Sync components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sierra-sync-normal
+  labels:
+    component: scheduling
+value: 500
+globalDefault: true
+description: "Normal priority Sierra Sync components"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: sierra-sync-low
+  labels:
+    component: scheduling
+value: 200
+globalDefault: false
+description: "Low priority Sierra Sync components"

@@ -1,0 +1,988 @@
+openapi: 3.1.0
+info:
+  title: Sierra Sync API
+  description: |
+    Real-time lead and sales data synchronization platform between Sierra Interactive and popular CRMs.
+    
+    ## Authentication
+    The API uses JWT Bearer tokens for authentication. Obtain a token via the `/auth/login` endpoint.
+    
+    ## Rate Limiting
+    - Free tier: 100 requests/minute
+    - Starter: 500 requests/minute
+    - Professional: 2000 requests/minute
+    - Enterprise: 10000 requests/minute
+    
+    ## Webhooks
+    Register webhooks to receive real-time updates on lead and sync events.
+  version: 1.0.0
+  contact:
+    name: Sierra Sync Support
+    email: support@sierrasync.com
+    url: https://sierrasync.com/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.sierrasync.com/v1
+    description: Production server
+  - url: https://staging-api.sierrasync.com/v1
+    description: Staging server
+  - url: http://localhost:3001/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+  - apiKey: []
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Organizations
+    description: Organization management
+  - name: Leads
+    description: Lead management and operations
+  - name: Sync
+    description: Synchronization operations
+  - name: Integrations
+    description: CRM integration management
+  - name: Webhooks
+    description: Webhook management
+  - name: Analytics
+    description: Analytics and reporting
+  - name: Health
+    description: System health and monitoring
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register new account
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login to account
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout and revoke tokens
+      operationId: logout
+      responses:
+        '204':
+          description: Logout successful
+
+  /organizations:
+    get:
+      tags: [Organizations]
+      summary: List organizations
+      operationId: listOrganizations
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Organizations list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationList'
+
+    post:
+      tags: [Organizations]
+      summary: Create organization
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+
+  /organizations/{id}:
+    get:
+      tags: [Organizations]
+      summary: Get organization details
+      operationId: getOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /leads:
+    get:
+      tags: [Leads]
+      summary: List leads
+      operationId: listLeads
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/LeadStatus'
+        - name: source
+          in: query
+          schema:
+            type: string
+        - name: score_min
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+        - name: assigned_to
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Leads list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadList'
+
+    post:
+      tags: [Leads]
+      summary: Create lead
+      operationId: createLead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLeadRequest'
+      responses:
+        '201':
+          description: Lead created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /leads/{id}:
+    get:
+      tags: [Leads]
+      summary: Get lead details
+      operationId: getLead
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      responses:
+        '200':
+          description: Lead details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Leads]
+      summary: Update lead
+      operationId: updateLead
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLeadRequest'
+      responses:
+        '200':
+          description: Lead updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+
+    delete:
+      tags: [Leads]
+      summary: Delete lead
+      operationId: deleteLead
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      responses:
+        '204':
+          description: Lead deleted
+
+  /sync/lead/{id}:
+    post:
+      tags: [Sync]
+      summary: Trigger lead sync
+      operationId: syncLead
+      parameters:
+        - $ref: '#/components/parameters/LeadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [crmTypes]
+              properties:
+                crmTypes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CRMType'
+                force:
+                  type: boolean
+                  default: false
+      responses:
+        '202':
+          description: Sync initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncJob'
+
+  /sync/status/{id}:
+    get:
+      tags: [Sync]
+      summary: Get sync status
+      operationId: getSyncStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatus'
+
+  /integrations:
+    get:
+      tags: [Integrations]
+      summary: List CRM integrations
+      operationId: listIntegrations
+      responses:
+        '200':
+          description: Integrations list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Integration'
+
+    post:
+      tags: [Integrations]
+      summary: Add CRM integration
+      operationId: addIntegration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIntegrationRequest'
+      responses:
+        '201':
+          description: Integration added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Integration'
+
+  /integrations/{id}/test:
+    post:
+      tags: [Integrations]
+      summary: Test integration connection
+      operationId: testIntegration
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  details:
+                    type: object
+
+  /webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List webhooks
+      operationId: listWebhooks
+      responses:
+        '200':
+          description: Webhooks list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Webhook'
+
+    post:
+      tags: [Webhooks]
+      summary: Register webhook
+      operationId: registerWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Webhook registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+
+  /webhooks/sierra:
+    post:
+      tags: [Webhooks]
+      summary: Sierra Interactive webhook endpoint
+      operationId: sierraWebhook
+      security: []
+      parameters:
+        - name: X-Sierra-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+
+  /analytics/dashboard:
+    get:
+      tags: [Analytics]
+      summary: Get dashboard metrics
+      operationId: getDashboardMetrics
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [today, week, month, year]
+            default: week
+      responses:
+        '200':
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardMetrics'
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Basic health check
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /health/detailed:
+    get:
+      tags: [Health]
+      summary: Detailed health check
+      operationId: detailedHealthCheck
+      security: []
+      responses:
+        '200':
+          description: Detailed health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    OrganizationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    
+    LeadId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        fullName:
+          type: string
+        organizationName:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+        organizationId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        subscriptionTier:
+          type: string
+          enum: [free, starter, professional, enterprise]
+        maxUsers:
+          type: integer
+        maxIntegrations:
+          type: integer
+        maxSyncsPerMonth:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Lead:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sierraId:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        leadSource:
+          type: string
+        leadScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        status:
+          $ref: '#/components/schemas/LeadStatus'
+        assignedTo:
+          type: string
+          format: uuid
+        propertyInterests:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        customFields:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LeadStatus:
+      type: string
+      enum: [new, contacted, qualified, proposal, negotiation, closed_won, closed_lost]
+
+    CRMType:
+      type: string
+      enum: [hubspot, salesforce, zoho, pipedrive, monday]
+
+    Integration:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        crmType:
+          $ref: '#/components/schemas/CRMType'
+        name:
+          type: string
+        isActive:
+          type: boolean
+        lastSyncAt:
+          type: string
+          format: date-time
+        fieldMappings:
+          type: object
+        syncSettings:
+          type: object
+
+    SyncJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    SyncStatus:
+      type: object
+      properties:
+        leadId:
+          type: string
+          format: uuid
+        hubspot:
+          $ref: '#/components/schemas/CRMSyncStatus'
+        salesforce:
+          $ref: '#/components/schemas/CRMSyncStatus'
+        zoho:
+          $ref: '#/components/schemas/CRMSyncStatus'
+
+    CRMSyncStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [synced, pending, failed]
+        lastSync:
+          type: string
+          format: date-time
+        error:
+          type: string
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        secret:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    DashboardMetrics:
+      type: object
+      properties:
+        totalLeads:
+          type: integer
+        leadsToday:
+          type: integer
+        totalSyncs:
+          type: integer
+        syncSuccessRate:
+          type: number
+        activeIntegrations:
+          type: integer
+        averageSyncTime:
+          type: number
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [up, down, degraded]
+              responseTime:
+                type: number
+              message:
+                type: string
+        version:
+          type: string
+        uptime:
+          type: number
+
+    CreateOrganizationRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        subscriptionTier:
+          type: string
+          enum: [free, starter, professional, enterprise]
+
+    CreateLeadRequest:
+      type: object
+      required: [firstName, lastName]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        leadSource:
+          type: string
+        leadScore:
+          type: integer
+        propertyInterests:
+          type: array
+          items:
+            type: string
+        customFields:
+          type: object
+
+    UpdateLeadRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        leadScore:
+          type: integer
+        status:
+          $ref: '#/components/schemas/LeadStatus'
+        assignedTo:
+          type: string
+          format: uuid
+
+    CreateIntegrationRequest:
+      type: object
+      required: [crmType, name]
+      properties:
+        crmType:
+          $ref: '#/components/schemas/CRMType'
+        name:
+          type: string
+        apiKey:
+          type: string
+        oauthTokens:
+          type: object
+        fieldMappings:
+          type: object
+
+    CreateWebhookRequest:
+      type: object
+      required: [url, events]
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        secret:
+          type: string
+
+    OrganizationList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organization'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    LeadList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Lead'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    RateLimited:
+      description: Rate limited
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: string
+            format: date-time
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

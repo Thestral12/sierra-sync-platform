@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Sierra Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="src/js/auth.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <div class="h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-xl">S</span>
+                        </div>
+                        <span class="ml-3 text-xl font-bold text-gray-900">Sierra Sync</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="goToDashboard()" class="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                        Dashboard
+                    </button>
+                    <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700">
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Profile Header -->
+    <div class="gradient-bg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="text-center">
+                <div class="mx-auto h-24 w-24 bg-white rounded-full flex items-center justify-center shadow-lg mb-4">
+                    <i data-lucide="user" class="h-12 w-12 text-gray-600"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-white mb-2" id="profileName">User Profile</h1>
+                <p class="text-blue-100" id="profileEmail">Loading...</p>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/20 text-white mt-2" id="profileRole">
+                    <i data-lucide="shield" class="h-4 w-4 mr-1"></i>
+                    Role
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Content -->
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Navigation Menu -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <nav class="space-y-2">
+                        <button onclick="showSection('account')" class="nav-item w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center active">
+                            <i data-lucide="user" class="h-5 w-5 mr-3 text-gray-400"></i>
+                            Account Information
+                        </button>
+                        <button onclick="showSection('security')" class="nav-item w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center">
+                            <i data-lucide="shield-check" class="h-5 w-5 mr-3 text-gray-400"></i>
+                            Security Settings
+                        </button>
+                        <button onclick="showSection('sessions')" class="nav-item w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center">
+                            <i data-lucide="monitor" class="h-5 w-5 mr-3 text-gray-400"></i>
+                            Active Sessions
+                        </button>
+                        <button onclick="showSection('preferences')" class="nav-item w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center">
+                            <i data-lucide="settings" class="h-5 w-5 mr-3 text-gray-400"></i>
+                            Preferences
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="lg:col-span-2">
+                <!-- Account Information Section -->
+                <div id="account-section" class="section-content">
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold mb-4">Account Information</h2>
+                        
+                        <form id="profileForm" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        First Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="firstName"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Enter first name"
+                                    />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        Last Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="lastName"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Enter last name"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Email Address
+                                </label>
+                                <input
+                                    type="email"
+                                    id="email"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
+                                    readonly
+                                />
+                                <p class="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Company
+                                </label>
+                                <input
+                                    type="text"
+                                    id="company"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Enter company name"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Role
+                                </label>
+                                <div class="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                                    <i data-lucide="shield" class="h-4 w-4 text-gray-400"></i>
+                                    <span id="userRole" class="text-gray-700 capitalize">Loading...</span>
+                                    <span class="text-xs text-gray-500 ml-auto">Role cannot be changed</span>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end">
+                                <button
+                                    type="submit"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+                                >
+                                    Update Profile
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Account Stats -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold mb-4">Account Statistics</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                <div class="text-2xl font-bold text-blue-600" id="memberSince">--</div>
+                                <div class="text-sm text-gray-600">Member Since</div>
+                            </div>
+                            <div class="text-center p-4 bg-green-50 rounded-lg">
+                                <div class="text-2xl font-bold text-green-600" id="lastLogin">--</div>
+                                <div class="text-sm text-gray-600">Last Login</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Section -->
+                <div id="security-section" class="section-content hidden">
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <h2 class="text-xl font-semibold mb-4">Change Password</h2>
+                        
+                        <form id="passwordForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Current Password
+                                </label>
+                                <input
+                                    type="password"
+                                    id="currentPassword"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Enter current password"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    id="newPassword"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Enter new password"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Confirm New Password
+                                </label>
+                                <input
+                                    type="password"
+                                    id="confirmPassword"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Confirm new password"
+                                />
+                            </div>
+
+                            <div class="flex justify-end">
+                                <button
+                                    type="submit"
+                                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500"
+                                >
+                                    Change Password
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Security Settings -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold mb-4">Security Settings</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-medium">Two-Factor Authentication</h4>
+                                    <p class="text-sm text-gray-500">Add an extra layer of security to your account</p>
+                                </div>
+                                <button class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                    Enable
+                                </button>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-medium">Email Notifications</h4>
+                                    <p class="text-sm text-gray-500">Get notified about security events</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sessions Section -->
+                <div id="sessions-section" class="section-content hidden">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-semibold mb-4">Active Sessions</h2>
+                        <div id="sessionsList" class="space-y-4">
+                            <!-- Sessions will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preferences Section -->
+                <div id="preferences-section" class="section-content hidden">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-semibold mb-4">Preferences</h2>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <h3 class="text-lg font-medium mb-3">Dashboard Settings</h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="font-medium">Dark Mode</h4>
+                                            <p class="text-sm text-gray-500">Use dark theme for dashboards</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="font-medium">Auto-refresh Data</h4>
+                                            <p class="text-sm text-gray-500">Automatically refresh dashboard data</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 class="text-lg font-medium mb-3">Notifications</h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="font-medium">Email Notifications</h4>
+                                            <p class="text-sm text-gray-500">Receive email updates about sync status</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <h4 class="font-medium">Browser Notifications</h4>
+                                            <p class="text-sm text-gray-500">Show browser notifications for important events</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end mt-6">
+                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500">
+                                Save Preferences
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="messageContainer" class="fixed top-4 right-4 z-50"></div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Current user data
+        let currentUser = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check authentication
+            if (!auth.requireAuth()) {
+                return;
+            }
+
+            try {
+                currentUser = await auth.getCurrentUser();
+                loadUserProfile();
+            } catch (error) {
+                console.error('Failed to load user profile:', error);
+                showMessage('Failed to load profile', 'error');
+            }
+        });
+
+        // Load user profile data
+        function loadUserProfile() {
+            if (!currentUser) return;
+
+            // Update header
+            document.getElementById('profileName').textContent = currentUser.name;
+            document.getElementById('profileEmail').textContent = currentUser.email;
+            document.getElementById('profileRole').innerHTML = `<i data-lucide="shield" class="h-4 w-4 mr-1"></i>${currentUser.role}`;
+
+            // Update form fields
+            const nameParts = currentUser.name.split(' ');
+            document.getElementById('firstName').value = nameParts[0] || '';
+            document.getElementById('lastName').value = nameParts.slice(1).join(' ') || '';
+            document.getElementById('email').value = currentUser.email;
+            document.getElementById('company').value = currentUser.company || '';
+            document.getElementById('userRole').textContent = currentUser.role;
+
+            // Update stats
+            if (currentUser.createdAt) {
+                const memberSince = new Date(currentUser.createdAt).getFullYear();
+                document.getElementById('memberSince').textContent = memberSince;
+            }
+            
+            if (currentUser.lastLogin) {
+                const lastLogin = new Date(currentUser.lastLogin).toLocaleDateString();
+                document.getElementById('lastLogin').textContent = lastLogin;
+            }
+
+            // Re-initialize icons
+            lucide.createIcons();
+        }
+
+        // Navigation functions
+        function showSection(section) {
+            // Hide all sections
+            document.querySelectorAll('.section-content').forEach(el => {
+                el.classList.add('hidden');
+            });
+
+            // Remove active class from nav items
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active', 'bg-blue-50', 'text-blue-700');
+            });
+
+            // Show selected section
+            document.getElementById(section + '-section').classList.remove('hidden');
+
+            // Add active class to nav item
+            event.target.classList.add('active', 'bg-blue-50', 'text-blue-700');
+
+            // Load section-specific data
+            if (section === 'sessions') {
+                loadActiveSessions();
+            }
+        }
+
+        // Go to dashboard based on user role
+        function goToDashboard() {
+            if (currentUser) {
+                auth.redirectToDashboard();
+            }
+        }
+
+        // Profile form submission
+        document.getElementById('profileForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const company = document.getElementById('company').value.trim();
+
+            try {
+                // In a real app, this would make an API call
+                showMessage('Profile updated successfully!', 'success');
+                
+                // Update current user data
+                currentUser.name = `${firstName} ${lastName}`;
+                currentUser.company = company;
+                
+                // Update header
+                document.getElementById('profileName').textContent = currentUser.name;
+                
+            } catch (error) {
+                console.error('Profile update error:', error);
+                showMessage('Failed to update profile', 'error');
+            }
+        });
+
+        // Password form submission
+        document.getElementById('passwordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (newPassword !== confirmPassword) {
+                showMessage('New passwords do not match', 'error');
+                return;
+            }
+
+            if (newPassword.length < 8) {
+                showMessage('Password must be at least 8 characters long', 'error');
+                return;
+            }
+
+            try {
+                await auth.changePassword(currentPassword, newPassword);
+                showMessage('Password changed successfully!', 'success');
+                
+                // Clear form
+                document.getElementById('passwordForm').reset();
+                
+            } catch (error) {
+                console.error('Password change error:', error);
+                showMessage(error.message, 'error');
+            }
+        });
+
+        // Load active sessions
+        async function loadActiveSessions() {
+            const sessionsList = document.getElementById('sessionsList');
+            sessionsList.innerHTML = '<div class="text-center py-4">Loading sessions...</div>';
+
+            try {
+                // In a real app, this would make an API call
+                const mockSessions = [
+                    {
+                        sessionId: 'current',
+                        createdAt: new Date(),
+                        userAgent: navigator.userAgent,
+                        ip: '127.0.0.1',
+                        current: true
+                    }
+                ];
+
+                sessionsList.innerHTML = mockSessions.map(session => `
+                    <div class="flex items-center justify-between p-4 border rounded-lg ${session.current ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}">
+                        <div class="flex items-center">
+                            <div class="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                <i data-lucide="monitor" class="h-4 w-4 text-blue-600"></i>
+                            </div>
+                            <div>
+                                <div class="font-medium flex items-center">
+                                    ${session.current ? 'Current Session' : 'Active Session'}
+                                    ${session.current ? '<span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Current</span>' : ''}
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    ${session.ip} • ${new Date(session.createdAt).toLocaleDateString()}
+                                </div>
+                                <div class="text-xs text-gray-400 mt-1">
+                                    ${session.userAgent.includes('Chrome') ? 'Chrome Browser' : 'Browser'}
+                                </div>
+                            </div>
+                        </div>
+                        ${!session.current ? `
+                            <button onclick="terminateSession('${session.sessionId}')" class="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm">
+                                Terminate
+                            </button>
+                        ` : ''}
+                    </div>
+                `).join('');
+
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error('Failed to load sessions:', error);
+                sessionsList.innerHTML = '<div class="text-center py-4 text-red-600">Failed to load sessions</div>';
+            }
+        }
+
+        // Terminate session
+        async function terminateSession(sessionId) {
+            try {
+                // In a real app, this would make an API call
+                showMessage('Session terminated successfully', 'success');
+                loadActiveSessions();
+            } catch (error) {
+                console.error('Failed to terminate session:', error);
+                showMessage('Failed to terminate session', 'error');
+            }
+        }
+
+        // Show message function
+        function showMessage(message, type = 'info') {
+            const messageContainer = document.getElementById('messageContainer');
+            const messageEl = document.createElement('div');
+            
+            const bgColor = type === 'error' ? 'bg-red-50 border-red-200' : 
+                           type === 'success' ? 'bg-green-50 border-green-200' : 
+                           'bg-blue-50 border-blue-200';
+            
+            const textColor = type === 'error' ? 'text-red-700' : 
+                             type === 'success' ? 'text-green-700' : 
+                             'text-blue-700';
+
+            const iconName = type === 'error' ? 'alert-circle' : 
+                            type === 'success' ? 'check-circle' : 
+                            'info';
+
+            messageEl.className = `${bgColor} ${textColor} border rounded-lg p-4 mb-4 shadow-sm`;
+            messageEl.innerHTML = `
+                <div class="flex items-center">
+                    <i data-lucide="${iconName}" class="h-5 w-5 mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+
+            messageContainer.appendChild(messageEl);
+            lucide.createIcons();
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                messageEl.remove();
+            }, 5000);
+        }
+
+        // Logout function (global)
+        function logout() {
+            auth.logout();
+        }
+    </script>
+</body>
+</html>

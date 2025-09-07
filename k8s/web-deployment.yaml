@@ -1,0 +1,201 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sierra-sync-web
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: frontend
+    version: v1.0.0
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    description: "Sierra Sync Web Frontend Application"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: sierra-sync-web
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: sierra-sync-web
+        component: frontend
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sierra-sync-web
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      imagePullSecrets:
+        - name: sierra-sync-registry
+      containers:
+        - name: web
+          image: ghcr.io/sierra-sync/web:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9091
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: NODE_ENV
+            - name: WEB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: WEB_PORT
+            - name: API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: API_BASE_URL
+            - name: WEB_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: sierra-sync-config
+                  key: WEB_BASE_URL
+          envFrom:
+            - configMapRef:
+                name: sierra-sync-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - sierra-sync-web
+                topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: "node.kubernetes.io/not-ready"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sierra-sync-web
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: frontend
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9091
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: sierra-sync-web
+    component: frontend
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sierra-sync-web
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+    component: frontend
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/sierra-sync-web-role
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sierra-sync-web-pdb
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-web
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: sierra-sync-web
+      component: frontend

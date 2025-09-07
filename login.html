@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Sierra Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .auth-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .input-focus:focus {
+            ring-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center">
+    <!-- Background Pattern -->
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="white" fill-opacity="0.1"%3E%3Cpath d="M20 20c0 11.046-8.954 20-20 20v-40c11.046 0 20 8.954 20 20z"/%3E%3C/g%3E%3C/svg%3E');"></div>
+    </div>
+
+    <!-- Login Form -->
+    <div class="relative z-10 w-full max-w-md px-6">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <div class="mx-auto h-12 w-12 bg-white rounded-lg flex items-center justify-center shadow-lg mb-4">
+                <div class="h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold text-xl">S</span>
+                </div>
+            </div>
+            <h1 class="text-2xl font-bold text-white">Sierra Sync</h1>
+            <p class="text-blue-100 mt-2">Sign in to your account</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="auth-card rounded-2xl shadow-2xl p-8 border border-white/20">
+            <form id="loginForm" class="space-y-6">
+                <!-- Email -->
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                        Email address
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="mail" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            autocomplete="email"
+                            required
+                            class="input-focus block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter your email"
+                        />
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="lock" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            autocomplete="current-password"
+                            required
+                            class="input-focus block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter your password"
+                        />
+                        <button
+                            type="button"
+                            id="togglePassword"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        >
+                            <i data-lucide="eye" id="eyeIcon" class="h-5 w-5 text-gray-400 hover:text-gray-600"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Remember Me & Forgot Password -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input
+                            id="remember"
+                            name="remember"
+                            type="checkbox"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label for="remember" class="ml-2 block text-sm text-gray-700">
+                            Remember me
+                        </label>
+                    </div>
+                    <a href="#" id="forgotPasswordLink" class="text-sm text-blue-600 hover:text-blue-500">
+                        Forgot password?
+                    </a>
+                </div>
+
+                <!-- Sign In Button -->
+                <button
+                    type="submit"
+                    id="signInBtn"
+                    class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <span id="signInText">Sign in</span>
+                    <i data-lucide="loader-2" id="loadingIcon" class="hidden ml-2 h-4 w-4 animate-spin"></i>
+                </button>
+
+                <!-- Demo Access -->
+                <div class="mt-6 border-t border-gray-200 pt-6">
+                    <p class="text-sm text-gray-600 text-center mb-4">Or try our demo</p>
+                    <div class="grid grid-cols-1 gap-3">
+                        <button
+                            type="button"
+                            onclick="demoLogin('operations')"
+                            class="w-full flex justify-center items-center py-2 px-4 border border-blue-300 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                        >
+                            <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2"></i>
+                            Demo: Operations Dashboard
+                        </button>
+                        <button
+                            type="button"
+                            onclick="demoLogin('admin')"
+                            class="w-full flex justify-center items-center py-2 px-4 border border-red-300 rounded-lg text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
+                        >
+                            <i data-lucide="settings" class="h-4 w-4 mr-2"></i>
+                            Demo: Admin Dashboard
+                        </button>
+                        <button
+                            type="button"
+                            onclick="demoLogin('analytics')"
+                            class="w-full flex justify-center items-center py-2 px-4 border border-green-300 rounded-lg text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 transition-colors"
+                        >
+                            <i data-lucide="trending-up" class="h-4 w-4 mr-2"></i>
+                            Demo: Analytics Dashboard
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sign Up Link -->
+                <div class="text-center">
+                    <p class="text-sm text-gray-600">
+                        Don't have an account?
+                        <a href="#" id="signUpLink" class="font-medium text-blue-600 hover:text-blue-500">
+                            Sign up for free
+                        </a>
+                    </p>
+                </div>
+            </form>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div class="flex items-center">
+                    <i data-lucide="alert-circle" class="h-5 w-5 text-red-400 mr-2"></i>
+                    <p class="text-sm text-red-700" id="errorText"></p>
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="hidden mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div class="flex items-center">
+                    <i data-lucide="check-circle" class="h-5 w-5 text-green-400 mr-2"></i>
+                    <p class="text-sm text-green-700" id="successText"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Back to Home -->
+        <div class="text-center mt-8">
+            <a href="index.html" class="text-blue-100 hover:text-white text-sm flex items-center justify-center">
+                <i data-lucide="arrow-left" class="h-4 w-4 mr-2"></i>
+                Back to home
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Form elements
+        const loginForm = document.getElementById('loginForm');
+        const signInBtn = document.getElementById('signInBtn');
+        const signInText = document.getElementById('signInText');
+        const loadingIcon = document.getElementById('loadingIcon');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        const eyeIcon = document.getElementById('eyeIcon');
+
+        // Demo user credentials
+        const demoUsers = {
+            'demo@sierrasync.com': {
+                password: 'demo123',
+                role: 'operations',
+                name: 'Demo User',
+                dashboard: 'main-dashboard.html'
+            },
+            'admin@sierrasync.com': {
+                password: 'admin123',
+                role: 'admin',
+                name: 'Admin User',
+                dashboard: 'dashboard.html'
+            },
+            'analytics@sierrasync.com': {
+                password: 'analytics123',
+                role: 'analytics',
+                name: 'Analytics User',
+                dashboard: 'analytics-dashboard.html'
+            }
+        };
+
+        // Toggle password visibility
+        togglePassword.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Update icon
+            eyeIcon.setAttribute('data-lucide', type === 'password' ? 'eye' : 'eye-off');
+            lucide.createIcons();
+        });
+
+        // Form submission
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const remember = document.getElementById('remember').checked;
+
+            // Show loading state
+            setLoadingState(true);
+            hideMessages();
+
+            try {
+                // Simulate API call delay
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Check demo credentials
+                if (demoUsers[email] && demoUsers[email].password === password) {
+                    const user = demoUsers[email];
+                    
+                    // Create session
+                    const sessionData = {
+                        id: Math.floor(Math.random() * 10000),
+                        email: email,
+                        name: user.name,
+                        role: user.role,
+                        dashboard: user.dashboard,
+                        loginTime: new Date().toISOString(),
+                        remember: remember
+                    };
+
+                    // Clear any existing sessions first
+                    localStorage.removeItem('sierraSync_session');
+                    sessionStorage.removeItem('sierraSync_session');
+                    localStorage.removeItem('sierraSync_token');
+                    sessionStorage.removeItem('sierraSync_token');
+                    
+                    // Store new session
+                    const storage = remember ? localStorage : sessionStorage;
+                    storage.setItem('sierraSync_session', JSON.stringify(sessionData));
+                    storage.setItem('sierraSync_token', 'demo_token_' + Date.now());
+
+                    // Show success message
+                    showSuccess('Login successful! Redirecting...');
+
+                    // Redirect after short delay
+                    setTimeout(() => {
+                        window.location.href = user.dashboard;
+                    }, 1500);
+                } else {
+                    throw new Error('Invalid email or password');
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                setLoadingState(false);
+            }
+        });
+
+        // Demo login functions
+        function demoLogin(type) {
+            const credentials = {
+                'operations': { email: 'demo@sierrasync.com', password: 'demo123' },
+                'admin': { email: 'admin@sierrasync.com', password: 'admin123' },
+                'analytics': { email: 'analytics@sierrasync.com', password: 'analytics123' }
+            };
+
+            if (credentials[type]) {
+                document.getElementById('email').value = credentials[type].email;
+                document.getElementById('password').value = credentials[type].password;
+                document.getElementById('remember').checked = false;
+                
+                // Auto submit form
+                loginForm.dispatchEvent(new Event('submit'));
+            }
+        }
+
+        // UI helper functions
+        function setLoadingState(loading) {
+            signInBtn.disabled = loading;
+            if (loading) {
+                signInText.textContent = 'Signing in...';
+                loadingIcon.classList.remove('hidden');
+            } else {
+                signInText.textContent = 'Sign in';
+                loadingIcon.classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            errorMessage.classList.remove('hidden');
+            successMessage.classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function showSuccess(message) {
+            document.getElementById('successText').textContent = message;
+            successMessage.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function hideMessages() {
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+        }
+
+        // Handle forgot password
+        document.getElementById('forgotPasswordLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            showSuccess('Password reset instructions would be sent to your email address.');
+        });
+
+        // Handle sign up
+        document.getElementById('signUpLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('Registration functionality would redirect to signup page.\n\nFor demo purposes, use one of the demo login buttons above.');
+        });
+
+        // Check if user is already logged in
+        window.addEventListener('load', function() {
+            // Don't redirect if we're already on the login page
+            if (window.location.pathname.includes('login.html')) {
+                // Clear any redirect loops
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('from') === 'redirect') {
+                    // Clear sessions to break the loop
+                    localStorage.removeItem('sierraSync_session');
+                    sessionStorage.removeItem('sierraSync_session');
+                    localStorage.removeItem('sierraSync_token');
+                    sessionStorage.removeItem('sierraSync_token');
+                    return;
+                }
+                
+                const session = localStorage.getItem('sierraSync_session') || sessionStorage.getItem('sierraSync_session');
+                if (session) {
+                    try {
+                        const userData = JSON.parse(session);
+                        const user = demoUsers[userData.email];
+                        if (user) {
+                            // Only redirect if we have a valid session
+                            window.location.href = user.dashboard;
+                        }
+                    } catch (e) {
+                        // Invalid session, clear it
+                        localStorage.removeItem('sierraSync_session');
+                        sessionStorage.removeItem('sierraSync_session');
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # n8n workflow automation engine
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: sierra-sync-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
+      - N8N_METRICS=true
+      - N8N_METRICS_PREFIX=n8n_
+      - EXECUTIONS_PROCESS=main
+      - N8N_LOG_LEVEL=info
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-workflows:/home/node/workflows
+    depends_on:
+      - postgres
+    networks:
+      - sierra-sync-network
+
+  # PostgreSQL database for n8n
+  postgres:
+    image: postgres:15-alpine
+    container_name: sierra-sync-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=n8n
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=n8n
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - sierra-sync-network
+
+  # Redis for caching and queue management
+  redis:
+    image: redis:7-alpine
+    container_name: sierra-sync-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sierra-sync-network
+
+  # API backend service
+  api:
+    build:
+      context: ./src/api
+      dockerfile: Dockerfile
+    container_name: sierra-sync-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - N8N_API_URL=http://n8n:5678
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - n8n
+    networks:
+      - sierra-sync-network
+
+  # Web UI service
+  web:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: sierra-sync-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    depends_on:
+      - api
+    networks:
+      - sierra-sync-network
+
+volumes:
+  n8n_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  sierra-sync-network:
+    driver: bridge

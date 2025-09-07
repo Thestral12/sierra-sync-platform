@@ -1,0 +1,307 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sierra-sync-config
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-api
+    component: config
+data:
+  # Application Configuration
+  NODE_ENV: "production"
+  API_PORT: "3001"
+  WEB_PORT: "3000"
+  LOG_LEVEL: "info"
+  
+  # External Service URLs
+  API_BASE_URL: "https://api.sierrasync.com"
+  WEB_BASE_URL: "https://sierrasync.com"
+  
+  # Database Configuration (non-sensitive)
+  DATABASE_HOST: "sierra-sync-postgres-primary"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "sierra_sync"
+  DATABASE_SSL: "require"
+  DATABASE_POOL_MIN: "5"
+  DATABASE_POOL_MAX: "20"
+  
+  # Redis Configuration (non-sensitive)
+  REDIS_HOST: "sierra-sync-redis-master"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # JWT Configuration
+  JWT_EXPIRY: "1h"
+  JWT_REFRESH_EXPIRY: "30d"
+  JWT_ALGORITHM: "RS256"
+  
+  # Rate Limiting Configuration
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX_REQUESTS: "1000"
+  RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS: "false"
+  
+  # CORS Configuration
+  CORS_ORIGIN: "https://sierrasync.com"
+  CORS_CREDENTIALS: "true"
+  
+  # File Upload Configuration
+  UPLOAD_MAX_SIZE: "10485760"  # 10MB
+  UPLOAD_ALLOWED_TYPES: "image/jpeg,image/png,application/pdf,text/csv"
+  
+  # Webhook Configuration
+  WEBHOOK_TIMEOUT_MS: "30000"
+  WEBHOOK_RETRY_ATTEMPTS: "3"
+  WEBHOOK_RETRY_DELAY_MS: "1000"
+  
+  # Queue Configuration
+  QUEUE_DEFAULT_JOB_DELAY: "0"
+  QUEUE_DEFAULT_JOB_ATTEMPTS: "3"
+  QUEUE_DEFAULT_JOB_TIMEOUT: "60000"
+  
+  # Monitoring Configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_INTERVAL: "30000"
+  
+  # Feature Flags
+  FEATURE_ANALYTICS_ENABLED: "true"
+  FEATURE_WEBHOOKS_ENABLED: "true"
+  FEATURE_FILE_UPLOAD_ENABLED: "true"
+  FEATURE_AUDIT_LOGGING_ENABLED: "true"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sierra-sync-nginx-config
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-nginx
+    component: config
+data:
+  nginx.conf: |
+    upstream api_backend {
+        least_conn;
+        server sierra-sync-api:3001 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+    
+    upstream web_backend {
+        least_conn;
+        server sierra-sync-web:3000 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+    
+    # Rate limiting zones
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=auth_limit:10m rate=5r/m;
+    limit_req_zone $binary_remote_addr zone=webhook_limit:10m rate=50r/s;
+    
+    # Connection limiting
+    limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+    
+    server {
+        listen 80;
+        listen 443 ssl http2;
+        server_name api.sierrasync.com;
+        
+        # SSL Configuration
+        ssl_certificate /etc/ssl/certs/api.sierrasync.com.crt;
+        ssl_certificate_key /etc/ssl/private/api.sierrasync.com.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        
+        # Security Headers
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Frame-Options DENY always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        
+        # Rate limiting
+        limit_conn conn_limit 20;
+        limit_req zone=api_limit burst=20 nodelay;
+        
+        # API Routes
+        location /api/auth/ {
+            limit_req zone=auth_limit burst=10 nodelay;
+            proxy_pass http://api_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /api/webhooks/ {
+            limit_req zone=webhook_limit burst=100 nodelay;
+            proxy_pass http://api_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /api/ {
+            proxy_pass http://api_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 30s;
+            proxy_read_timeout 60s;
+        }
+        
+        # Health checks
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+    
+    server {
+        listen 80;
+        listen 443 ssl http2;
+        server_name sierrasync.com;
+        
+        # SSL Configuration
+        ssl_certificate /etc/ssl/certs/sierrasync.com.crt;
+        ssl_certificate_key /etc/ssl/private/sierrasync.com.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        
+        # Security Headers
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Frame-Options SAMEORIGIN always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        
+        # Static assets caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            proxy_pass http://web_backend;
+        }
+        
+        # Web application
+        location / {
+            proxy_pass http://web_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sierra-sync-postgres-config
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-postgres
+    component: config
+data:
+  postgresql.conf: |
+    # Connection Settings
+    max_connections = 200
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    maintenance_work_mem = 64MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 4MB
+    min_wal_size = 1GB
+    max_wal_size = 4GB
+    
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = '/var/lib/postgresql/data/log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    log_temp_files = 0
+    
+    # Replication
+    wal_level = replica
+    max_wal_senders = 3
+    max_replication_slots = 3
+    hot_standby = on
+    
+    # Performance
+    shared_preload_libraries = 'pg_stat_statements'
+    track_activity_query_size = 2048
+    track_functions = all
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sierra-sync-redis-config
+  namespace: sierra-sync
+  labels:
+    app: sierra-sync-redis
+    component: config
+data:
+  redis.conf: |
+    # Network
+    bind 0.0.0.0
+    port 6379
+    protected-mode yes
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+    
+    # General
+    daemonize no
+    pidfile /var/run/redis_6379.pid
+    loglevel notice
+    logfile ""
+    databases 16
+    
+    # Snapshotting
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    rdbcompression yes
+    rdbchecksum yes
+    dbfilename dump.rdb
+    dir ./
+    
+    # Replication
+    replica-serve-stale-data yes
+    replica-read-only yes
+    repl-diskless-sync no
+    repl-diskless-sync-delay 5
+    repl-ping-replica-period 10
+    repl-timeout 60
+    repl-disable-tcp-nodelay no
+    repl-backlog-size 1mb
+    repl-backlog-ttl 3600
+    
+    # Security
+    requirepass ${REDIS_PASSWORD}
+    
+    # Memory Management
+    maxmemory 512mb
+    maxmemory-policy allkeys-lru
+    maxmemory-samples 5
+    
+    # Lazy Freeing
+    lazyfree-lazy-eviction no
+    lazyfree-lazy-expire no
+    lazyfree-lazy-server-del no
+    replica-lazy-flush no

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Sierra Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .auth-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .input-focus:focus {
+            ring-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+        .strength-bar {
+            height: 4px;
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen flex items-center justify-center py-8">
+    <!-- Background Pattern -->
+    <div class="absolute inset-0 opacity-10">
+        <div class="absolute inset-0" style="background-image: url('data:image/svg+xml,%3Csvg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="white" fill-opacity="0.1"%3E%3Cpath d="M20 20c0 11.046-8.954 20-20 20v-40c11.046 0 20 8.954 20 20z"/%3E%3C/g%3E%3C/svg%3E');"></div>
+    </div>
+
+    <!-- Registration Form -->
+    <div class="relative z-10 w-full max-w-lg px-6">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <div class="mx-auto h-12 w-12 bg-white rounded-lg flex items-center justify-center shadow-lg mb-4">
+                <div class="h-8 w-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <span class="text-white font-bold text-xl">S</span>
+                </div>
+            </div>
+            <h1 class="text-2xl font-bold text-white">Sierra Sync</h1>
+            <p class="text-blue-100 mt-2">Create your account</p>
+        </div>
+
+        <!-- Registration Card -->
+        <div class="auth-card rounded-2xl shadow-2xl p-8 border border-white/20">
+            <form id="registerForm" class="space-y-6">
+                <!-- Name Fields -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="firstName" class="block text-sm font-medium text-gray-700 mb-2">
+                            First Name
+                        </label>
+                        <input
+                            id="firstName"
+                            name="firstName"
+                            type="text"
+                            required
+                            class="input-focus block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="John"
+                        />
+                    </div>
+                    <div>
+                        <label for="lastName" class="block text-sm font-medium text-gray-700 mb-2">
+                            Last Name
+                        </label>
+                        <input
+                            id="lastName"
+                            name="lastName"
+                            type="text"
+                            required
+                            class="input-focus block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Doe"
+                        />
+                    </div>
+                </div>
+
+                <!-- Email -->
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                        Email address
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="mail" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            autocomplete="email"
+                            required
+                            class="input-focus block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="john@company.com"
+                        />
+                    </div>
+                </div>
+
+                <!-- Company -->
+                <div>
+                    <label for="company" class="block text-sm font-medium text-gray-700 mb-2">
+                        Company Name
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="building" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input
+                            id="company"
+                            name="company"
+                            type="text"
+                            required
+                            class="input-focus block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Real Estate Company"
+                        />
+                    </div>
+                </div>
+
+                <!-- Role Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Primary Role
+                    </label>
+                    <div class="grid grid-cols-1 gap-3">
+                        <label class="relative flex cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-3 shadow-sm hover:bg-gray-50">
+                            <input type="radio" name="role" value="operations" class="sr-only" checked />
+                            <span class="flex flex-1">
+                                <span class="flex flex-col">
+                                    <span class="block text-sm font-medium text-gray-900 flex items-center">
+                                        <i data-lucide="bar-chart-3" class="h-4 w-4 mr-2 text-blue-600"></i>
+                                        Operations Manager
+                                    </span>
+                                    <span class="block text-xs text-gray-500">Manage leads, sync status, and daily operations</span>
+                                </span>
+                            </span>
+                            <div class="radio-indicator"></div>
+                        </label>
+
+                        <label class="relative flex cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-3 shadow-sm hover:bg-gray-50">
+                            <input type="radio" name="role" value="analytics" class="sr-only" />
+                            <span class="flex flex-1">
+                                <span class="flex flex-col">
+                                    <span class="block text-sm font-medium text-gray-900 flex items-center">
+                                        <i data-lucide="trending-up" class="h-4 w-4 mr-2 text-green-600"></i>
+                                        Analytics Specialist
+                                    </span>
+                                    <span class="block text-xs text-gray-500">Focus on reports, metrics, and business intelligence</span>
+                                </span>
+                            </span>
+                            <div class="radio-indicator"></div>
+                        </label>
+
+                        <label class="relative flex cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-3 shadow-sm hover:bg-gray-50">
+                            <input type="radio" name="role" value="admin" class="sr-only" />
+                            <span class="flex flex-1">
+                                <span class="flex flex-col">
+                                    <span class="block text-sm font-medium text-gray-900 flex items-center">
+                                        <i data-lucide="settings" class="h-4 w-4 mr-2 text-red-600"></i>
+                                        Administrator
+                                    </span>
+                                    <span class="block text-xs text-gray-500">Full access to system settings and user management</span>
+                                </span>
+                            </span>
+                            <div class="radio-indicator"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="lock" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            autocomplete="new-password"
+                            required
+                            class="input-focus block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Create a strong password"
+                        />
+                        <button
+                            type="button"
+                            id="togglePassword"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center"
+                        >
+                            <i data-lucide="eye" id="eyeIcon" class="h-5 w-5 text-gray-400 hover:text-gray-600"></i>
+                        </button>
+                    </div>
+                    <!-- Password Strength Indicator -->
+                    <div class="mt-2">
+                        <div class="flex space-x-1">
+                            <div id="strength-1" class="strength-bar flex-1 bg-gray-200 rounded"></div>
+                            <div id="strength-2" class="strength-bar flex-1 bg-gray-200 rounded"></div>
+                            <div id="strength-3" class="strength-bar flex-1 bg-gray-200 rounded"></div>
+                            <div id="strength-4" class="strength-bar flex-1 bg-gray-200 rounded"></div>
+                        </div>
+                        <p id="strength-text" class="text-xs text-gray-500 mt-1">Password strength: Weak</p>
+                    </div>
+                </div>
+
+                <!-- Confirm Password -->
+                <div>
+                    <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-2">
+                        Confirm Password
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="lock" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input
+                            id="confirmPassword"
+                            name="confirmPassword"
+                            type="password"
+                            autocomplete="new-password"
+                            required
+                            class="input-focus block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Confirm your password"
+                        />
+                    </div>
+                </div>
+
+                <!-- Terms and Privacy -->
+                <div class="flex items-start">
+                    <input
+                        id="terms"
+                        name="terms"
+                        type="checkbox"
+                        required
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
+                    />
+                    <div class="ml-3 text-sm">
+                        <label for="terms" class="text-gray-700">
+                            I agree to the 
+                            <a href="#" class="text-blue-600 hover:text-blue-500">Terms of Service</a>
+                            and 
+                            <a href="#" class="text-blue-600 hover:text-blue-500">Privacy Policy</a>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Marketing Consent -->
+                <div class="flex items-start">
+                    <input
+                        id="marketing"
+                        name="marketing"
+                        type="checkbox"
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
+                    />
+                    <div class="ml-3 text-sm">
+                        <label for="marketing" class="text-gray-700">
+                            I'd like to receive product updates and marketing emails
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Sign Up Button -->
+                <button
+                    type="submit"
+                    id="signUpBtn"
+                    class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <span id="signUpText">Create Account</span>
+                    <i data-lucide="loader-2" id="loadingIcon" class="hidden ml-2 h-4 w-4 animate-spin"></i>
+                </button>
+
+                <!-- Sign In Link -->
+                <div class="text-center">
+                    <p class="text-sm text-gray-600">
+                        Already have an account?
+                        <a href="login.html" class="font-medium text-blue-600 hover:text-blue-500">
+                            Sign in here
+                        </a>
+                    </p>
+                </div>
+            </form>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div class="flex items-center">
+                    <i data-lucide="alert-circle" class="h-5 w-5 text-red-400 mr-2"></i>
+                    <p class="text-sm text-red-700" id="errorText"></p>
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="hidden mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div class="flex items-center">
+                    <i data-lucide="check-circle" class="h-5 w-5 text-green-400 mr-2"></i>
+                    <p class="text-sm text-green-700" id="successText"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Back to Home -->
+        <div class="text-center mt-8">
+            <a href="index.html" class="text-blue-100 hover:text-white text-sm flex items-center justify-center">
+                <i data-lucide="arrow-left" class="h-4 w-4 mr-2"></i>
+                Back to home
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Form elements
+        const registerForm = document.getElementById('registerForm');
+        const signUpBtn = document.getElementById('signUpBtn');
+        const signUpText = document.getElementById('signUpText');
+        const loadingIcon = document.getElementById('loadingIcon');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const eyeIcon = document.getElementById('eyeIcon');
+
+        // Password strength elements
+        const strengthBars = [
+            document.getElementById('strength-1'),
+            document.getElementById('strength-2'),
+            document.getElementById('strength-3'),
+            document.getElementById('strength-4')
+        ];
+        const strengthText = document.getElementById('strength-text');
+
+        // Toggle password visibility
+        togglePassword.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Update icon
+            eyeIcon.setAttribute('data-lucide', type === 'password' ? 'eye' : 'eye-off');
+            lucide.createIcons();
+        });
+
+        // Password strength checker
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            let feedback = [];
+
+            // Length check
+            if (password.length >= 8) strength += 1;
+            else feedback.push('at least 8 characters');
+
+            // Uppercase check
+            if (/[A-Z]/.test(password)) strength += 1;
+            else feedback.push('uppercase letter');
+
+            // Lowercase check  
+            if (/[a-z]/.test(password)) strength += 1;
+            else feedback.push('lowercase letter');
+
+            // Number or special character check
+            if (/[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password)) strength += 1;
+            else feedback.push('number or special character');
+
+            return { strength, feedback };
+        }
+
+        // Update password strength indicator
+        function updatePasswordStrength(password) {
+            const { strength, feedback } = checkPasswordStrength(password);
+            
+            // Reset all bars
+            strengthBars.forEach(bar => {
+                bar.className = 'strength-bar flex-1 bg-gray-200 rounded';
+            });
+
+            // Update strength bars
+            const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'];
+            const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+            
+            for (let i = 0; i < strength; i++) {
+                strengthBars[i].className = `strength-bar flex-1 ${colors[strength - 1]} rounded`;
+            }
+
+            // Update text
+            if (password.length === 0) {
+                strengthText.textContent = 'Password strength: Weak';
+                strengthText.className = 'text-xs text-gray-500 mt-1';
+            } else {
+                strengthText.textContent = `Password strength: ${labels[strength - 1]}`;
+                const textColors = ['text-red-600', 'text-orange-600', 'text-yellow-600', 'text-green-600'];
+                strengthText.className = `text-xs ${textColors[strength - 1]} mt-1`;
+                
+                if (feedback.length > 0) {
+                    strengthText.textContent += ` (needs: ${feedback.join(', ')})`;
+                }
+            }
+        }
+
+        // Password input event listener
+        passwordInput.addEventListener('input', function() {
+            updatePasswordStrength(this.value);
+        });
+
+        // Confirm password validation
+        function validatePasswordMatch() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            
+            if (confirmPassword && password !== confirmPassword) {
+                confirmPasswordInput.setCustomValidity('Passwords do not match');
+                return false;
+            } else {
+                confirmPasswordInput.setCustomValidity('');
+                return true;
+            }
+        }
+
+        confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+        passwordInput.addEventListener('input', validatePasswordMatch);
+
+        // Role selection handling
+        document.querySelectorAll('input[name="role"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Update visual indicators
+                document.querySelectorAll('label[for="role"]').forEach(label => {
+                    label.classList.remove('ring-2', 'ring-blue-500', 'border-blue-500');
+                });
+                
+                this.closest('label').classList.add('ring-2', 'ring-blue-500', 'border-blue-500');
+            });
+        });
+
+        // Form submission
+        registerForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Get form data
+            const formData = new FormData(registerForm);
+            const data = {
+                firstName: formData.get('firstName').trim(),
+                lastName: formData.get('lastName').trim(),
+                email: formData.get('email').trim().toLowerCase(),
+                company: formData.get('company').trim(),
+                role: formData.get('role'),
+                password: formData.get('password'),
+                confirmPassword: formData.get('confirmPassword'),
+                terms: formData.get('terms'),
+                marketing: formData.get('marketing') === 'on'
+            };
+
+            // Validation
+            const { strength } = checkPasswordStrength(data.password);
+            if (strength < 3) {
+                showError('Please choose a stronger password');
+                return;
+            }
+
+            if (data.password !== data.confirmPassword) {
+                showError('Passwords do not match');
+                return;
+            }
+
+            if (!data.terms) {
+                showError('You must agree to the Terms of Service');
+                return;
+            }
+
+            // Show loading state
+            setLoadingState(true);
+            hideMessages();
+
+            try {
+                // Simulate API call delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // In a real app, this would make an API call to register the user
+                const response = await simulateRegistration(data);
+
+                if (response.success) {
+                    showSuccess('Account created successfully! Please check your email to verify your account.');
+                    
+                    // Reset form
+                    registerForm.reset();
+                    updatePasswordStrength('');
+                    
+                    // Redirect to login after delay
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 3000);
+                } else {
+                    throw new Error(response.error || 'Registration failed');
+                }
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                setLoadingState(false);
+            }
+        });
+
+        // Simulate registration API call
+        async function simulateRegistration(data) {
+            // Simulate email already exists check
+            const existingEmails = ['demo@sierrasync.com', 'admin@sierrasync.com', 'analytics@sierrasync.com'];
+            
+            if (existingEmails.includes(data.email)) {
+                return {
+                    success: false,
+                    error: 'An account with this email already exists'
+                };
+            }
+
+            // Simulate successful registration
+            console.log('New user registration:', {
+                name: `${data.firstName} ${data.lastName}`,
+                email: data.email,
+                company: data.company,
+                role: data.role,
+                marketing: data.marketing
+            });
+
+            return {
+                success: true,
+                user: {
+                    id: Math.floor(Math.random() * 10000),
+                    email: data.email,
+                    name: `${data.firstName} ${data.lastName}`,
+                    role: data.role,
+                    company: data.company
+                }
+            };
+        }
+
+        // UI helper functions
+        function setLoadingState(loading) {
+            signUpBtn.disabled = loading;
+            if (loading) {
+                signUpText.textContent = 'Creating Account...';
+                loadingIcon.classList.remove('hidden');
+            } else {
+                signUpText.textContent = 'Create Account';
+                loadingIcon.classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            errorMessage.classList.remove('hidden');
+            successMessage.classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function showSuccess(message) {
+            document.getElementById('successText').textContent = message;
+            successMessage.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function hideMessages() {
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+name: Blue-Green Deployment
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        default: 'blue-green'
+        type: choice
+        options:
+          - blue-green
+          - canary
+          - rolling
+      canary_weight:
+        description: 'Canary traffic weight (%)'
+        required: false
+        default: '10'
+        type: number
+      auto_promote:
+        description: 'Auto-promote after successful analysis'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_API: sierra-sync/api
+  IMAGE_NAME_WEB: sierra-sync/web
+  DEPLOYMENT_TIMEOUT: 15
+
+jobs:
+  # Build and test before deployment
+  build-and-test:
+    runs-on: ubuntu-latest
+    outputs:
+      api-image: ${{ steps.meta-api.outputs.tags }}
+      web-image: ${{ steps.meta-web.outputs.tags }}
+      image-tag: ${{ steps.meta-api.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract API metadata
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_API }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract Web metadata
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_WEB }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/api.Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/web.Dockerfile
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Run security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta-api.outputs.tags }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload security scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Deploy to staging for testing
+  deploy-staging:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name sierra-sync-staging-cluster --region us-east-1
+
+      - name: Install Argo Rollouts CLI
+        run: |
+          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          sudo install -o root -g root -m 0755 kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+          rm kubectl-argo-rollouts-linux-amd64
+
+      - name: Deploy to staging
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh deploy ${{ needs.build-and-test.outputs.image-tag }} \
+            --namespace sierra-sync-staging \
+            --timeout ${{ env.DEPLOYMENT_TIMEOUT }} \
+            --wait
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Run smoke tests against staging
+        run: |
+          sleep 30  # Wait for deployment to stabilize
+          
+          # Health check
+          kubectl exec -n sierra-sync-staging deployment/sierra-sync-api -- \
+            curl -f http://sierra-sync-api-preview.sierra-sync-staging.svc.cluster.local:3001/api/health
+          
+          # Basic API test
+          kubectl exec -n sierra-sync-staging deployment/sierra-sync-api -- \
+            curl -f http://sierra-sync-api-preview.sierra-sync-staging.svc.cluster.local:3001/api/health/db
+
+      - name: Promote staging deployment
+        if: success()
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh promote \
+            --namespace sierra-sync-staging \
+            --wait
+
+  # Production deployment
+  deploy-production:
+    needs: [build-and-test, deploy-staging]
+    if: github.ref == 'refs/heads/main' && success()
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_PROD_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PROD_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name sierra-sync-prod-cluster --region us-east-1
+
+      - name: Install Argo Rollouts CLI
+        run: |
+          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          sudo install -o root -g root -m 0755 kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+          rm kubectl-argo-rollouts-linux-amd64
+
+      - name: Pre-deployment health check
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh health --namespace sierra-sync
+
+      - name: Deploy to production (Blue-Green)
+        if: github.event.inputs.deployment_type == 'blue-green' || github.event.inputs.deployment_type == ''
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh deploy ${{ needs.build-and-test.outputs.image-tag }} \
+            --namespace sierra-sync \
+            --timeout ${{ env.DEPLOYMENT_TIMEOUT }} \
+            --wait
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Deploy to production (Canary)
+        if: github.event.inputs.deployment_type == 'canary'
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh canary ${{ needs.build-and-test.outputs.image-tag }} \
+            ${{ github.event.inputs.canary_weight || '10' }} \
+            --namespace sierra-sync \
+            --timeout ${{ env.DEPLOYMENT_TIMEOUT }} \
+            --wait
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Wait for analysis completion
+        run: |
+          echo "Waiting for analysis to complete..."
+          sleep 300  # 5 minutes for analysis
+          
+          # Check analysis status
+          ANALYSIS_STATUS=$(kubectl get analysisrun -l rollout=sierra-sync-api-rollout \
+            -n sierra-sync -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "Unknown")
+          
+          echo "Analysis status: $ANALYSIS_STATUS"
+          
+          if [ "$ANALYSIS_STATUS" != "Successful" ]; then
+            echo "Analysis failed or incomplete, manual review required"
+            exit 1
+          fi
+
+      - name: Auto-promote if enabled
+        if: github.event.inputs.auto_promote == 'true' && success()
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh promote \
+            --namespace sierra-sync \
+            --wait
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Manual promotion required
+        if: github.event.inputs.auto_promote != 'true' || github.event.inputs.auto_promote == ''
+        run: |
+          echo "🎯 Deployment ready for manual promotion!"
+          echo "Run: kubectl argo rollouts promote sierra-sync-api-rollout -n sierra-sync"
+          echo "Or use: ./k8s/blue-green/deployment-scripts.sh promote"
+
+      - name: Post-deployment verification
+        if: github.event.inputs.auto_promote == 'true' && success()
+        run: |
+          sleep 60  # Wait for promotion to complete
+          
+          # Verify active services are healthy
+          ./k8s/blue-green/deployment-scripts.sh health --namespace sierra-sync
+          
+          # Run production smoke tests
+          kubectl exec -n sierra-sync deployment/sierra-sync-api -- \
+            curl -f http://sierra-sync-api-active.sierra-sync.svc.cluster.local:3001/api/health
+          
+          # Test critical endpoints
+          kubectl exec -n sierra-sync deployment/sierra-sync-api -- \
+            curl -f http://sierra-sync-api-active.sierra-sync.svc.cluster.local:3001/api/health/db
+          
+          kubectl exec -n sierra-sync deployment/sierra-sync-api -- \
+            curl -f http://sierra-sync-api-active.sierra-sync.svc.cluster.local:3001/api/health/cache
+
+      - name: Deployment status
+        if: always()
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh status --namespace sierra-sync
+
+  # Rollback on failure
+  rollback-on-failure:
+    needs: [deploy-production]
+    if: failure() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_PROD_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PROD_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name sierra-sync-prod-cluster --region us-east-1
+
+      - name: Install Argo Rollouts CLI
+        run: |
+          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          sudo install -o root -g root -m 0755 kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+          rm kubectl-argo-rollouts-linux-amd64
+
+      - name: Rollback deployment
+        run: |
+          ./k8s/blue-green/deployment-scripts.sh rollback \
+            --namespace sierra-sync \
+            --wait
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Verify rollback
+        run: |
+          sleep 30
+          ./k8s/blue-green/deployment-scripts.sh health --namespace sierra-sync
+
+  # Notification and reporting
+  notify-completion:
+    needs: [deploy-production]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify deployment completion
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ needs.deploy-production.result }}
+          text: |
+            🚀 Sierra Sync Production Deployment Complete!
+            
+            Status: ${{ needs.deploy-production.result }}
+            Image: ${{ needs.build-and-test.outputs.image-tag }}
+            Commit: ${{ github.sha }}
+            
+            ${{ needs.deploy-production.result == 'success' && '✅ Ready for promotion' || '❌ Deployment failed' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: always()

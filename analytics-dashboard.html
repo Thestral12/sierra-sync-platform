@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sierra Sync - Analytics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .hidden { display: none; }
+    </style>
+    <script src="src/js/auth.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Analytics Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold">📊 Sierra Sync - Analytics Dashboard</h1>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <select class="bg-white bg-opacity-20 text-white border border-white border-opacity-30 rounded-md px-3 py-1 text-sm">
+                        <option>Last 7 days</option>
+                        <option>Last 30 days</option>
+                        <option>Last 90 days</option>
+                    </select>
+                    <a href="main-dashboard.html" id="mainDashboardLink" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                        Operations Dashboard
+                    </a>
+                    <a href="dashboard.html" id="adminDashboardLink" class="hidden bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                        Admin Dashboard
+                    </a>
+                    <button onclick="auth.logout()" class="bg-red-600 bg-opacity-80 hover:bg-opacity-100 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Key Performance Indicators -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <!-- Total Leads -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Leads</h3>
+                        <p class="text-2xl font-bold text-gray-900">12,847</p>
+                        <p class="text-sm text-green-600">+23.5%</p>
+                    </div>
+                    <i data-lucide="users" class="w-8 h-8 text-blue-600"></i>
+                </div>
+            </div>
+
+            <!-- Conversion Rate -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Conversion Rate</h3>
+                        <p class="text-2xl font-bold text-gray-900">8.4%</p>
+                        <p class="text-sm text-green-600">+1.2%</p>
+                    </div>
+                    <i data-lucide="target" class="w-8 h-8 text-green-600"></i>
+                </div>
+            </div>
+
+            <!-- Avg Deal Size -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Avg Deal Size</h3>
+                        <p class="text-2xl font-bold text-gray-900">$4,890</p>
+                        <p class="text-sm text-red-600">-2.1%</p>
+                    </div>
+                    <i data-lucide="dollar-sign" class="w-8 h-8 text-yellow-600"></i>
+                </div>
+            </div>
+
+            <!-- Sales Velocity -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Sales Velocity</h3>
+                        <p class="text-2xl font-bold text-gray-900">42 days</p>
+                        <p class="text-sm text-green-600">-5 days</p>
+                    </div>
+                    <i data-lucide="trending-up" class="w-8 h-8 text-purple-600"></i>
+                </div>
+            </div>
+
+            <!-- Pipeline Value -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide">Pipeline Value</h3>
+                        <p class="text-2xl font-bold text-gray-900">$2.4M</p>
+                        <p class="text-sm text-green-600">+15.8%</p>
+                    </div>
+                    <i data-lucide="trending-up" class="w-8 h-8 text-indigo-600"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Analytics Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Lead Sources Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Lead Sources</h3>
+                    <p class="text-sm text-gray-600">Distribution of lead generation channels</p>
+                </div>
+                <div class="relative h-64">
+                    <canvas id="leadSourceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Conversion Funnel -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Conversion Funnel</h3>
+                    <p class="text-sm text-gray-600">Lead to customer conversion stages</p>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium">Website Visitors</span>
+                        <span class="text-sm text-gray-500">100,000</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-blue-500 h-2 rounded-full" style="width: 100%"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium">Leads Generated</span>
+                        <span class="text-sm text-gray-500">12,847 (12.8%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-green-500 h-2 rounded-full" style="width: 12.8%"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium">Qualified Leads</span>
+                        <span class="text-sm text-gray-500">3,854 (30%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-yellow-500 h-2 rounded-full" style="width: 3.85%"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium">Opportunities</span>
+                        <span class="text-sm text-gray-500">1,542 (40%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-orange-500 h-2 rounded-full" style="width: 1.54%"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium">Customers</span>
+                        <span class="text-sm text-gray-500">324 (21%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="bg-red-500 h-2 rounded-full" style="width: 0.32%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue Analytics -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow mb-8">
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-900">Revenue Analytics</h3>
+                <p class="text-sm text-gray-600">Monthly revenue trends and forecasting</p>
+            </div>
+            <div class="relative h-80">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Performance by CRM -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- CRM Performance -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Performance by CRM</h3>
+                    <p class="text-sm text-gray-600">Sync success rates by integration</p>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 bg-orange-100 rounded-md flex items-center justify-center mr-3">
+                                <span class="text-xs font-bold text-orange-600">SF</span>
+                            </div>
+                            <span class="text-sm font-medium">Salesforce</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-500 mr-2">99.2%</span>
+                            <div class="w-20 bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 99.2%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center mr-3">
+                                <span class="text-xs font-bold text-blue-600">HS</span>
+                            </div>
+                            <span class="text-sm font-medium">HubSpot</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-500 mr-2">98.7%</span>
+                            <div class="w-20 bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 98.7%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 bg-red-100 rounded-md flex items-center justify-center mr-3">
+                                <span class="text-xs font-bold text-red-600">ZH</span>
+                            </div>
+                            <span class="text-sm font-medium">Zoho CRM</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-500 mr-2">97.1%</span>
+                            <div class="w-20 bg-gray-200 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 97.1%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center mr-3">
+                                <span class="text-xs font-bold text-purple-600">PP</span>
+                            </div>
+                            <span class="text-sm font-medium">Pipedrive</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-500 mr-2">96.4%</span>
+                            <div class="w-20 bg-gray-200 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 96.4%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Peak Usage Times -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Peak Usage Times</h3>
+                    <p class="text-sm text-gray-600">Sync activity throughout the day</p>
+                </div>
+                <div class="relative h-48">
+                    <canvas id="usageChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Geographic Distribution -->
+        <div class="bg-white rounded-lg shadow-md p-6 card-shadow">
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-900">Geographic Distribution</h3>
+                <p class="text-sm text-gray-600">Lead distribution by region</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">4,523</div>
+                    <div class="text-sm text-gray-600">North America</div>
+                    <div class="text-xs text-green-600">+12.3%</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600">3,108</div>
+                    <div class="text-sm text-gray-600">Europe</div>
+                    <div class="text-xs text-green-600">+8.7%</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-yellow-600">2,847</div>
+                    <div class="text-sm text-gray-600">Asia Pacific</div>
+                    <div class="text-xs text-green-600">+15.2%</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-purple-600">1,234</div>
+                    <div class="text-sm text-gray-600">Other Regions</div>
+                    <div class="text-xs text-red-600">-2.1%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication and role
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Auth object already initialized with session check in constructor
+            if (!auth.isAuthenticated) {
+                console.log('Not authenticated, redirecting to login');
+                auth.redirectToLogin();
+                return;
+            }
+            
+            // Check if user has analytics or admin role
+            const user = auth.currentUser;
+            console.log('Analytics dashboard - Current user:', user);
+            
+            if (user.role !== 'analytics' && user.role !== 'admin') {
+                console.log('User role', user.role, 'not allowed, redirecting');
+                auth.redirectToDashboard();
+                return;
+            }
+            
+            // Show admin link only for admin users
+            const adminLink = document.getElementById('adminDashboardLink');
+            if (adminLink && user.role === 'admin') {
+                adminLink.classList.remove('hidden');
+            }
+            
+            // Hide operations link for operations users (they're already on their dashboard)
+            const mainDashboardLink = document.getElementById('mainDashboardLink');
+            if (mainDashboardLink && user.role === 'operations') {
+                mainDashboardLink.classList.add('hidden');
+            }
+        });
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Lead Sources Pie Chart
+        const leadSourceCtx = document.getElementById('leadSourceChart').getContext('2d');
+        new Chart(leadSourceCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Website', 'Social Media', 'Email', 'Referrals', 'Ads', 'Other'],
+                datasets: [{
+                    data: [35, 25, 20, 12, 6, 2],
+                    backgroundColor: [
+                        '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#6B7280'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Revenue Chart
+        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+        new Chart(revenueCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Revenue ($)',
+                    data: [180000, 195000, 210000, 225000, 240000, 255000, 270000, 285000, 300000, 315000, 330000, 345000],
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Forecast ($)',
+                    data: [null, null, null, null, null, null, null, null, 300000, 320000, 340000, 360000],
+                    borderColor: 'rgb(107, 114, 128)',
+                    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + (value / 1000) + 'K';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Usage Chart
+        const usageCtx = document.getElementById('usageChart').getContext('2d');
+        new Chart(usageCtx, {
+            type: 'bar',
+            data: {
+                labels: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM'],
+                datasets: [{
+                    label: 'Sync Operations',
+                    data: [45, 89, 156, 134, 98, 67],
+                    backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

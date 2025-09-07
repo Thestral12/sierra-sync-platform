@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sierra Sync - Real Estate CRM Integration Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-gray-50 to-white min-h-screen">
+    <!-- Header -->
+    <header class="container mx-auto px-4 py-6">
+        <nav class="flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="zap" class="h-8 w-8 text-blue-600"></i>
+                <span class="text-2xl font-bold">Sierra Sync</span>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="showLogin()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Sign In
+                </button>
+                <button onclick="showDashboard()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    View Demo Dashboard
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Landing Page -->
+    <div id="landing-page" class="container mx-auto px-4 py-16">
+        <section class="text-center mb-16">
+            <h1 class="text-5xl font-bold mb-6">
+                Automate Your Real Estate Lead Management
+            </h1>
+            <p class="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                Seamlessly sync leads between Sierra Interactive and your favorite CRMs. 
+                Save hours of manual data entry and never miss a hot lead again.
+            </p>
+            <div class="flex gap-4 justify-center">
+                <button onclick="showDashboard()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-lg">
+                    Start Free Trial
+                </button>
+                <button onclick="showDemo()" class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-lg">
+                    Watch Demo
+                </button>
+            </div>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i data-lucide="zap" class="h-6 w-6 text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Real-time Sync</h3>
+                </div>
+                <p class="text-gray-600">Instant lead synchronization between Sierra Interactive and your CRMs</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i data-lucide="users" class="h-6 w-6 text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Multi-CRM Support</h3>
+                </div>
+                <p class="text-gray-600">Connect HubSpot, Salesforce, Zoho, and more simultaneously</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i data-lucide="workflow" class="h-6 w-6 text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Custom Workflows</h3>
+                </div>
+                <p class="text-gray-600">Build automated lead routing and follow-up sequences</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i data-lucide="shield" class="h-6 w-6 text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Secure & Compliant</h3>
+                </div>
+                <p class="text-gray-600">Enterprise-grade security with OAuth 2.0 and encrypted data</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i data-lucide="bar-chart-3" class="h-6 w-6 text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Analytics Dashboard</h3>
+                </div>
+                <p class="text-gray-600">Monitor sync performance and lead flow metrics in real-time</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <i data-lucide="check-circle-2" class="h-6 w-6 text-blue-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Error Recovery</h3>
+                </div>
+                <p class="text-gray-600">Automatic retry logic and comprehensive error handling</p>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="bg-blue-50 rounded-2xl p-12 text-center">
+            <h2 class="text-3xl font-bold mb-4">
+                Trusted by 500+ Real Estate Teams
+            </h2>
+            <p class="text-lg text-gray-600 mb-8">
+                Join successful real estate professionals who've automated their lead management
+            </p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <div class="text-3xl font-bold text-blue-600">10M+</div>
+                    <div class="text-gray-600">Leads Synced</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold text-blue-600">99.9%</div>
+                    <div class="text-gray-600">Uptime</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold text-blue-600">5min</div>
+                    <div class="text-gray-600">Setup Time</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold text-blue-600">24/7</div>
+                    <div class="text-gray-600">Support</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Dashboard (Hidden by default) -->
+    <div id="dashboard" class="hidden container mx-auto px-4 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <h2 class="text-3xl font-bold">Dashboard</h2>
+            <div class="flex items-center space-x-2">
+                <button onclick="simulateSync()" class="px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 flex items-center gap-2">
+                    <i data-lucide="refresh-cw" id="refresh-icon" class="h-4 w-4"></i>
+                    Manual Sync
+                </button>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                    <i data-lucide="plus" class="h-4 w-4"></i>
+                    Add Integration
+                </button>
+            </div>
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-sm text-gray-600">Total Leads Synced</span>
+                    <i data-lucide="users" class="h-4 w-4 text-gray-400"></i>
+                </div>
+                <div class="text-2xl font-bold" id="total-leads">2,543</div>
+                <p class="text-xs text-green-600 mt-2">↑ +12.5% from last week</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-sm text-gray-600">Active Integrations</span>
+                    <i data-lucide="zap" class="h-4 w-4 text-gray-400"></i>
+                </div>
+                <div class="text-2xl font-bold">4</div>
+                <div class="flex gap-1 mt-2">
+                    <span class="px-2 py-1 bg-gray-100 text-xs rounded">HubSpot</span>
+                    <span class="px-2 py-1 bg-gray-100 text-xs rounded">Salesforce</span>
+                    <span class="px-2 py-1 bg-gray-100 text-xs rounded">Zoho</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-sm text-gray-600">Sync Success Rate</span>
+                    <i data-lucide="check-circle-2" class="h-4 w-4 text-gray-400"></i>
+                </div>
+                <div class="text-2xl font-bold">98.7%</div>
+                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div class="bg-green-500 h-2 rounded-full" style="width: 98.7%"></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border">
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-sm text-gray-600">Avg Sync Time</span>
+                    <i data-lucide="clock" class="h-4 w-4 text-gray-400"></i>
+                </div>
+                <div class="text-2xl font-bold">1.2s</div>
+                <p class="text-xs text-green-600 mt-2">↑ 15% faster than yesterday</p>
+            </div>
+        </div>
+
+        <!-- Activity Feed -->
+        <div class="bg-white rounded-lg shadow-sm border">
+            <div class="p-6 border-b">
+                <h3 class="text-lg font-semibold">Real-time Activity</h3>
+                <p class="text-sm text-gray-600">Live feed of sync operations</p>
+            </div>
+            <div class="p-6 space-y-4" id="activity-feed">
+                <!-- Activity items will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Back Button -->
+        <button onclick="showLanding()" class="mt-8 px-4 py-2 text-gray-600 hover:text-gray-900">
+            ← Back to Home
+        </button>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Sample activity data
+        const activities = [
+            { name: 'John Doe', email: 'john@example.com', crm: 'HubSpot', status: 'completed', time: 'Just now' },
+            { name: 'Jane Smith', email: 'jane@example.com', crm: 'Salesforce', status: 'syncing', time: '2 min ago' },
+            { name: 'Mike Johnson', email: 'mike@example.com', crm: 'Zoho', status: 'completed', time: '5 min ago' },
+            { name: 'Sarah Williams', email: 'sarah@example.com', crm: 'HubSpot', status: 'failed', time: '10 min ago' },
+            { name: 'Tom Brown', email: 'tom@example.com', crm: 'Salesforce', status: 'completed', time: '15 min ago' }
+        ];
+
+        let totalLeads = 2543;
+
+        function showDashboard() {
+            document.getElementById('landing-page').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            renderActivityFeed();
+            startRealTimeUpdates();
+        }
+
+        function showLanding() {
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('landing-page').classList.remove('hidden');
+        }
+
+        function showLogin() {
+            alert('Login functionality would be here in the full application');
+        }
+
+        function showDemo() {
+            alert('Demo video would play here in the full application');
+        }
+
+        function renderActivityFeed() {
+            const feed = document.getElementById('activity-feed');
+            feed.innerHTML = activities.map(activity => `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="p-2 rounded-full ${
+                            activity.status === 'completed' ? 'bg-green-100' : 
+                            activity.status === 'failed' ? 'bg-red-100' : 'bg-yellow-100'
+                        }">
+                            <i data-lucide="${
+                                activity.status === 'completed' ? 'check-circle-2' : 
+                                activity.status === 'failed' ? 'alert-circle' : 'activity'
+                            }" class="h-4 w-4 ${
+                                activity.status === 'completed' ? 'text-green-600' : 
+                                activity.status === 'failed' ? 'text-red-600' : 'text-yellow-600 animate-pulse-slow'
+                            }"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium">${activity.name} → ${activity.crm}</p>
+                            <p class="text-xs text-gray-500">${activity.email} • ${activity.time}</p>
+                        </div>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded ${
+                        activity.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        activity.status === 'failed' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                    }">
+                        ${activity.status}
+                    </span>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function simulateSync() {
+            const icon = document.getElementById('refresh-icon');
+            icon.classList.add('animate-spin');
+            
+            setTimeout(() => {
+                icon.classList.remove('animate-spin');
+                
+                // Add new activity
+                const newActivity = {
+                    name: 'New Lead',
+                    email: `lead${Math.floor(Math.random() * 1000)}@example.com`,
+                    crm: ['HubSpot', 'Salesforce', 'Zoho'][Math.floor(Math.random() * 3)],
+                    status: 'syncing',
+                    time: 'Just now'
+                };
+                
+                activities.unshift(newActivity);
+                activities.pop();
+                renderActivityFeed();
+                
+                // Update total leads
+                totalLeads += 1;
+                document.getElementById('total-leads').textContent = totalLeads.toLocaleString();
+                
+                // Complete the sync after a delay
+                setTimeout(() => {
+                    newActivity.status = 'completed';
+                    renderActivityFeed();
+                }, 2000);
+            }, 1500);
+        }
+
+        function startRealTimeUpdates() {
+            setInterval(() => {
+                // Simulate random status updates
+                if (Math.random() > 0.7) {
+                    const syncingIndex = activities.findIndex(a => a.status === 'syncing');
+                    if (syncingIndex !== -1) {
+                        activities[syncingIndex].status = 'completed';
+                        renderActivityFeed();
+                    }
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

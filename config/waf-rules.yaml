@@ -1,0 +1,235 @@
+# Web Application Firewall (WAF) Configuration
+# CloudFlare WAF Rules for Sierra Sync Platform
+
+version: "1.0"
+description: "WAF rules for Sierra Sync - Real Estate CRM Automation Platform"
+
+# Rate Limiting Rules
+rate_limiting:
+  api_endpoints:
+    - name: "API Rate Limit"
+      path: "/api/*"
+      limit: 1000  # requests per minute
+      window: 60   # seconds
+      action: "challenge"
+      
+    - name: "Auth Rate Limit"
+      path: "/api/auth/login"
+      limit: 5     # attempts per minute
+      window: 60   # seconds
+      action: "block"
+      duration: 300 # 5 minutes
+      
+    - name: "Registration Rate Limit"
+      path: "/api/auth/register"
+      limit: 3     # attempts per minute
+      window: 60   # seconds
+      action: "challenge"
+
+  webhook_endpoints:
+    - name: "Webhook Rate Limit"
+      path: "/api/webhooks/*"
+      limit: 500   # requests per minute
+      window: 60   # seconds
+      action: "log"
+
+# Security Rules
+security_rules:
+  sql_injection:
+    enabled: true
+    sensitivity: "high"
+    action: "block"
+    paths: ["/api/*"]
+    
+  xss_protection:
+    enabled: true
+    sensitivity: "high" 
+    action: "block"
+    paths: ["/*"]
+    
+  rfi_lfi_protection:
+    enabled: true
+    action: "block"
+    paths: ["/api/*"]
+    
+  command_injection:
+    enabled: true
+    action: "block"
+    paths: ["/api/*"]
+
+# Bot Management
+bot_management:
+  block_known_bots:
+    enabled: true
+    exceptions: ["GoogleBot", "BingBot", "FacebookBot"]
+    
+  challenge_suspicious:
+    enabled: true
+    score_threshold: 30
+    action: "js_challenge"
+    
+  allow_good_bots:
+    enabled: true
+    verified_bots: ["GoogleBot", "BingBot", "TwitterBot"]
+
+# Geographic Rules
+geographic_rules:
+  allowed_countries:
+    - "US"  # United States
+    - "CA"  # Canada
+    - "GB"  # United Kingdom
+    - "AU"  # Australia
+    - "DE"  # Germany
+    - "FR"  # France
+    - "NL"  # Netherlands
+    - "SE"  # Sweden
+    - "NO"  # Norway
+    - "DK"  # Denmark
+    
+  blocked_countries:
+    - "CN"  # China (due to compliance)
+    - "RU"  # Russia (due to sanctions)
+    - "KP"  # North Korea
+    - "IR"  # Iran
+    
+  action_for_blocked: "block"
+  action_for_unlisted: "challenge"
+
+# Custom Rules
+custom_rules:
+  - name: "Block Admin Panel Access"
+    expression: "(http.request.uri.path contains \"/admin\") and (not ip.src in $admin_ips)"
+    action: "block"
+    
+  - name: "API Key Validation"
+    expression: "(http.request.uri.path matches \"^/api/(?!auth|health)\") and (not http.request.headers[\"x-api-key\"][0] matches \"^sk_[a-zA-Z0-9]{32}$\")"
+    action: "challenge"
+    
+  - name: "Block Suspicious User Agents"
+    expression: "http.request.headers[\"user-agent\"][0] contains \"sqlmap\" or http.request.headers[\"user-agent\"][0] contains \"nmap\" or http.request.headers[\"user-agent\"][0] contains \"nikto\""
+    action: "block"
+    
+  - name: "Protect Upload Endpoints"
+    expression: "(http.request.uri.path contains \"/upload\" or http.request.uri.path contains \"/import\") and (http.request.method ne \"POST\" or not http.request.headers[\"content-type\"][0] matches \"^multipart/form-data\")"
+    action: "block"
+
+# IP Lists
+ip_lists:
+  admin_ips:
+    - "10.0.0.0/8"        # Internal network
+    - "192.168.0.0/16"    # Local network
+    - "172.16.0.0/12"     # Private network
+    
+  trusted_ips:
+    - "44.192.0.0/11"     # HubSpot IPs
+    - "52.1.0.0/16"       # Salesforce IPs
+    - "54.240.0.0/12"     # Zoho IPs
+    
+  blocked_ips:
+    - "0.0.0.0/0"         # Placeholder for blocked IPs
+
+# DDoS Protection
+ddos_protection:
+  enabled: true
+  sensitivity: "high"
+  threshold:
+    requests_per_second: 100
+    concurrent_connections: 500
+    
+  actions:
+    - "rate_limit"
+    - "challenge"
+    - "block" # Last resort
+
+# Content Security Policy (CSP) Headers
+security_headers:
+  content_security_policy:
+    default_src: "'self'"
+    script_src: "'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com"
+    style_src: "'self' 'unsafe-inline' https://fonts.googleapis.com"
+    font_src: "'self' https://fonts.gstatic.com"
+    img_src: "'self' data: https:"
+    connect_src: "'self' https://api.sierrasync.com wss://api.sierrasync.com"
+    frame_ancestors: "'none'"
+    
+  strict_transport_security: "max-age=31536000; includeSubDomains"
+  x_frame_options: "DENY"
+  x_content_type_options: "nosniff"
+  x_xss_protection: "1; mode=block"
+  referrer_policy: "strict-origin-when-cross-origin"
+
+# Monitoring and Logging
+monitoring:
+  log_level: "info"
+  sample_rate: 1.0  # Log 100% of requests
+  
+  custom_fields:
+    - "cf.bot_score"
+    - "cf.threat_score" 
+    - "cf.edge_response_time"
+    - "cf.ray_id"
+    
+  alerts:
+    - name: "High Threat Score"
+      condition: "cf.threat_score > 50"
+      action: "webhook"
+      webhook_url: "https://api.sierrasync.com/webhooks/security-alert"
+      
+    - name: "Blocked Request Spike"
+      condition: "count() > 100 in 5m where action = 'block'"
+      action: "email"
+      email: "security@sierrasync.com"
+
+# Performance Rules
+performance_rules:
+  compression:
+    enabled: true
+    algorithms: ["gzip", "brotli"]
+    min_file_size: 1024  # bytes
+    file_types: ["text/*", "application/json", "application/javascript", "text/css"]
+    
+  caching:
+    browser_cache_ttl: 3600  # 1 hour for dynamic content
+    edge_cache_ttl: 86400    # 24 hours for static assets
+    
+    cache_rules:
+      - path: "/api/health"
+        ttl: 60  # 1 minute
+        
+      - path: "/static/*"
+        ttl: 604800  # 1 week
+        
+      - path: "*.css"
+        ttl: 604800  # 1 week
+        
+      - path: "*.js"
+        ttl: 604800  # 1 week
+
+# Bypass Rules (for legitimate traffic)
+bypass_rules:
+  - name: "Health Check Bypass"
+    expression: "http.request.uri.path eq \"/api/health\""
+    action: "allow"
+    
+  - name: "Webhook Signature Verified"
+    expression: "http.request.uri.path matches \"^/api/webhooks/\" and http.request.headers[\"x-webhook-signature\"][0] exists"
+    action: "allow"
+    
+  - name: "Internal Service Mesh"
+    expression: "ip.src in $internal_service_ips"
+    action: "allow"
+
+# Emergency Rules (can be quickly enabled)
+emergency_rules:
+  lockdown_mode:
+    enabled: false
+    description: "Block all traffic except admins"
+    expression: "not ip.src in $admin_ips"
+    action: "block"
+    
+  maintenance_mode:
+    enabled: false
+    description: "Show maintenance page"
+    expression: "http.request.uri.path ne \"/maintenance\""
+    action: "redirect"
+    redirect_url: "/maintenance"
