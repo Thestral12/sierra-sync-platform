@@ -18,6 +18,34 @@
             ring-color: #3b82f6;
             border-color: #3b82f6;
         }
+        
+        /* Prevent zoom on iOS when focusing inputs */
+        @supports (-webkit-touch-callout: none) {
+            input, textarea, select {
+                font-size: 16px !important;
+            }
+        }
+        
+        /* Ensure touch targets are 44x44px minimum */
+        button, a {
+            min-height: 44px;
+            min-width: 44px;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .auth-card {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            /* Stack demo buttons vertically on very small screens */
+            @media (max-width: 380px) {
+                .demo-buttons {
+                    grid-template-columns: 1fr;
+                }
+            }
+        }
     </style>
 </head>
 <body class="gradient-bg min-h-screen flex items-center justify-center">
@@ -55,9 +83,10 @@
                             id="email"
                             name="email"
                             type="email"
+                            inputmode="email"
                             autocomplete="email"
                             required
-                            class="input-focus block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="input-focus block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
                             placeholder="Enter your email"
                         />
                     </div>
@@ -76,15 +105,17 @@
                             id="password"
                             name="password"
                             type="password"
+                            inputmode="text"
                             autocomplete="current-password"
                             required
-                            class="input-focus block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="input-focus block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
                             placeholder="Enter your password"
                         />
                         <button
                             type="button"
                             id="togglePassword"
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center min-w-[44px]"
+                            aria-label="Toggle password visibility"
                         >
                             <i data-lucide="eye" id="eyeIcon" class="h-5 w-5 text-gray-400 hover:text-gray-600"></i>
                         </button>
@@ -113,7 +144,8 @@
                 <button
                     type="submit"
                     id="signInBtn"
-                    class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[48px]"
+                    aria-label="Sign in to your account"
                 >
                     <span id="signInText">Sign in</span>
                     <i data-lucide="loader-2" id="loadingIcon" class="hidden ml-2 h-4 w-4 animate-spin"></i>
@@ -122,7 +154,7 @@
                 <!-- Demo Access -->
                 <div class="mt-6 border-t border-gray-200 pt-6">
                     <p class="text-sm text-gray-600 text-center mb-4">Or try our demo</p>
-                    <div class="grid grid-cols-1 gap-3">
+                    <div class="grid grid-cols-1 gap-3 demo-buttons">
                         <button
                             type="button"
                             onclick="demoLogin('operations')"
